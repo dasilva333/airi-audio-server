@@ -90,8 +90,21 @@ class AudioCppEngine {
     this.activeModel = modelId;
     this.activeVoice = voiceRef;
 
-    this.process.stdout.on('data', (data) => console.log(`[audio.cpp] ${data.toString().trim()}`));
-    this.process.stderr.on('data', (data) => console.error(`[audio.cpp err] ${data.toString().trim()}`));
+    this.process.stdout.on('data', (data) => {
+      const line = data.toString().trim();
+      if (line && !line.includes('CUDA graph warmup')) {
+        console.log(`[audio.cpp] ${line}`);
+      }
+    });
+
+    this.process.stderr.on('data', (data) => {
+      const line = data.toString().trim();
+      // Suppress noisy CUDA graph warmup lines
+      if (line && !line.includes('CUDA graph warmup')) {
+        console.error(`[audio.cpp err] ${line}`);
+      }
+    });
+
     this.process.on('exit', (code) => {
       console.log(`[Engine] audiocpp_server process exited with code ${code}`);
       this.isReady = false;

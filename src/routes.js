@@ -7,6 +7,13 @@ const { runWhisperStt } = require('./stt');
 
 const upload = multer({ dest: path.join(__dirname, '../temp_uploads') });
 
+function parseWavDuration(buffer) {
+  if (buffer.length < 44) return 0;
+  const byteRate = buffer.readUInt32LE(28);
+  if (byteRate === 0) return 0;
+  return (buffer.length - 44) / byteRate;
+}
+
 function createRouter(engine, voiceManager, textProcessor, gpuQueue, config) {
   const router = express.Router();
 
@@ -34,9 +41,6 @@ function createRouter(engine, voiceManager, textProcessor, gpuQueue, config) {
 
   // GET Capabilities Manifest (/v1/capabilities, /chatterbox/capabilities)
   const handleCapabilities = (req, res) => {
-    const activeModelId = engine.activeModel || engine.getDefaultModelId();
-    const modelCfg = config.models[activeModelId] || {};
-    
     res.json({
       voices: voiceManager.listVoices(),
       profiles: [],
@@ -130,27 +134,48 @@ function createRouter(engine, voiceManager, textProcessor, gpuQueue, config) {
       const cleanedInput = textProcessor.process(input, shouldBypass);
 
       console.log(`[API] Speech Request: model='${modelId}', voice='${voice}', fmt='${response_format}'`);
+      const tStart = Date.now();
 
       // Enqueue job in Unified Serialized GPU FIFO Queue
-      const audioResultBuffer = await gpuQueue.enqueue(async () => {
+      const { finalBuffer, rawWavBuffer, audioDuration } = await gpuQueue.enqueue(async () => {
         // Resolve voice reference & JIT STT transcription if needed
         const voiceData = await voiceManager.resolveVoice(voice);
         const voiceRef = voiceData ? voiceData.file : null;
         const refText = voiceData ? voiceData.transcript : '';
 
         // Synthesize via audio.cpp
-        const rawWavBuffer = await engine.synthesize(cleanedInput, modelId, voiceRef, refText);
+        const rawBuffer = await engine.synthesize(cleanedInput, modelId, voiceRef, refText);
+        const dur = parseWavDuration(rawBuffer);
 
-        // Convert format to Opus OGG if requested (default AIRI format)
+        let finalBuf = rawBuffer;
         if (response_format === 'ogg' || response_format === 'opus') {
-          return await convertWavToOgg(rawWavBuffer);
+          finalBuf = await convertWavToOgg(rawBuffer);
         }
-        return rawWavBuffer;
+
+        return { finalBuffer: finalBuf, rawWavBuffer: rawBuffer, audioDuration: dur };
       });
+
+      const latencyMs = Date.now() - tStart;
+      const latencySec = (latencyMs / 1000).toFixed(3);
+      const rtf = audioDuration > 0 ? (latencyMs / 1000 / audioDuration).toFixed(4) : "0.0000";
+      const realtimeSpeed = latencyMs > 0 && audioDuration > 0 ? (audioDuration / (latencyMs / 1000)).toFixed(2) : "0.00";
+
+      console.log("=" * 60);
+      console.log(`[API RTF Metric] Synthesis SUCCESS`);
+      console.log(`  Model          : ${modelId}`);
+      console.log(`  Latency        : ${latencySec}s (${latencyMs} ms)`);
+      console.log(`  Audio Duration : ${audioDuration.toFixed(2)}s`);
+      console.log(`  Real-Time Factor: ${rtf} (${realtimeSpeed}x real-time speed)`);
+      console.log("=" * 60);
 
       const contentType = response_format === 'ogg' ? 'audio/ogg' : 'audio/wav';
       res.setHeader('Content-Type', contentType);
-      return res.status(200).send(audioResultBuffer);
+      res.setHeader('X-Synthesis-Latency-Ms', latencyMs.toString());
+      res.setHeader('X-Audio-Duration-Sec', audioDuration.toFixed(2));
+      res.setHeader('X-Real-Time-Factor', rtf);
+      res.setHeader('X-Realtime-Speed', `${realtimeSpeed}x`);
+
+      return res.status(200).send(finalBuffer);
 
     } catch (err) {
       console.error(`[Speech API Error] ${err.message}`);

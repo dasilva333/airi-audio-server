@@ -160,13 +160,13 @@ function createRouter(engine, voiceManager, textProcessor, gpuQueue, config) {
       const rtf = audioDuration > 0 ? (latencyMs / 1000 / audioDuration).toFixed(4) : "0.0000";
       const realtimeSpeed = latencyMs > 0 && audioDuration > 0 ? (audioDuration / (latencyMs / 1000)).toFixed(2) : "0.00";
 
-      console.log("=" * 60);
+      console.log("=".repeat(60));
       console.log(`[API RTF Metric] Synthesis SUCCESS`);
-      console.log(`  Model          : ${modelId}`);
-      console.log(`  Latency        : ${latencySec}s (${latencyMs} ms)`);
-      console.log(`  Audio Duration : ${audioDuration.toFixed(2)}s`);
+      console.log(`  Model           : ${modelId}`);
+      console.log(`  Latency         : ${latencySec}s (${latencyMs} ms)`);
+      console.log(`  Audio Duration  : ${audioDuration.toFixed(2)}s`);
       console.log(`  Real-Time Factor: ${rtf} (${realtimeSpeed}x real-time speed)`);
-      console.log("=" * 60);
+      console.log("=".repeat(60));
 
       const contentType = response_format === 'ogg' ? 'audio/ogg' : 'audio/wav';
       res.setHeader('Content-Type', contentType);

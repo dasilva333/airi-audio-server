@@ -38,13 +38,13 @@ const PORT = config.port || 8090;
 const HOST = config.host || '0.0.0.0';
 
 app.listen(PORT, HOST, () => {
-  console.log("=" * 60);
+  console.log("=".repeat(60));
   console.log(`[AIRI Audio Server] Running on http://${HOST}:${PORT}`);
   console.log(`OpenAI Speech Endpoint  : http://localhost:${PORT}/v1/audio/speech`);
   console.log(`OpenAI Models Endpoint  : http://localhost:${PORT}/v1/models`);
   console.log(`Voice Discovery         : http://localhost:${PORT}/v1/voices`);
   console.log(`Capabilities Manifest   : http://localhost:${PORT}/v1/capabilities`);
-  console.log("=" * 60);
+  console.log("=".repeat(60));
 });
 
 // Cleanup process on shutdown

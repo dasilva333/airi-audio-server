@@ -13,7 +13,7 @@ const MODEL_CATALOG = [
     family: "omnivoice",
     vram: "~1.12 GB",
     features: "Zero-Shot Voice Cloning, Paralinguistic Expression Tags, 0.28 RTF",
-    path: "C:\\Users\\h4rdc\\Documents\\Github\\coding-agent\\audio.cpp\\models\\OmniVoice-GGUF\\omnivoice-q8_0.gguf"
+    path: "C:/Users/h4rdc/Documents/Github/coding-agent/audio.cpp/models/OmniVoice-GGUF/omnivoice-q8_0.gguf"
   },
   {
     num: "2",
@@ -22,7 +22,7 @@ const MODEL_CATALOG = [
     family: "fish_audio",
     vram: "~6.31 GB",
     features: "Dual-AR Fast Streaming Synthesis, Zero-Shot Voice Cloning, 1.25 RTF",
-    path: "C:\\Users\\h4rdc\\Documents\\Github\\coding-agent\\audio.cpp\\models\\Fish-Audio-S2-Pro-GGUF\\fish-audio-s2-pro-q8_0.gguf"
+    path: "C:/Users/h4rdc/Documents/Github/coding-agent/audio.cpp/models/Fish-Audio-S2-Pro-GGUF/fish-audio-s2-pro-q8_0.gguf"
   },
   {
     num: "3",
@@ -31,7 +31,7 @@ const MODEL_CATALOG = [
     family: "kokoro",
     vram: "~0.85 GB",
     features: "Ultra-Lightweight Speech Model",
-    path: "C:\\Users\\h4rdc\\Documents\\Github\\coding-agent\\audio.cpp\\models\\Kokoro-GGUF\\kokoro-q8_0.gguf"
+    path: "C:/Users/h4rdc/Documents/Github/coding-agent/audio.cpp/models/Kokoro-GGUF/kokoro-q8_0.gguf"
   },
   {
     num: "4",
@@ -40,14 +40,14 @@ const MODEL_CATALOG = [
     family: "qwen_audio",
     vram: "~3.50 GB",
     features: "Multilingual Voice Synthesis",
-    path: "C:\\Users\\h4rdc\\Documents\\Github\\coding-agent\\audio.cpp\\models\\Qwen-GGUF\\qwen-q8_0.gguf"
+    path: "C:/Users/h4rdc/Documents/Github/coding-agent/audio.cpp/models/Qwen-GGUF/qwen-q8_0.gguf"
   }
 ];
 
 function runSetup() {
-  console.log("=" * 60);
+  console.log("=".repeat(60));
   console.log("      AIRI Audio Server - Interactive Model Setup Wizard      ");
-  console.log("=" * 60);
+  console.log("=".repeat(60));
   console.log("Installing Node.js dependencies...");
   try {
     execSync('npm install', { stdio: 'inherit', cwd: __dirname });

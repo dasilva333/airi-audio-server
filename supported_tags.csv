@@ -1,0 +1,23 @@
+category,tag,description,type
+emotion,laughter,Spoken laughter,both
+emotion,sigh,Soft reflective release,both
+emotion,gasp,Sharp intake from surprise or shock,both
+emotion,groan,Low vocal complaint or strain,both
+sound,cough,Audible cough,both
+sound,clear_throat,Audible throat clearing,both
+sound,sniff,Audible sniff,both
+sound,shhh,Silencing sound,both
+sound,chuckle,Quiet laughter,both
+emotion,laughter,OmniVoice: Native laughter,omni
+emotion,sigh,OmniVoice: Native sigh,omni
+emotion,confirmation-en,OmniVoice: English confirmation,omni
+emotion,question-en,OmniVoice: English question intonation,omni
+emotion,question-ah,OmniVoice: Question ah,omni
+emotion,question-oh,OmniVoice: Question oh,omni
+emotion,question-ei,OmniVoice: Question ei,omni
+emotion,question-yi,OmniVoice: Question yi,omni
+emotion,surprise-ah,OmniVoice: Surprised ah,omni
+emotion,surprise-oh,OmniVoice: Surprised oh,omni
+emotion,surprise-wa,OmniVoice: Surprised wa,omni
+emotion,surprise-yo,OmniVoice: Surprised yo,omni
+emotion,dissatisfaction-hnn,OmniVoice: Dissatisfaction hnn,omni

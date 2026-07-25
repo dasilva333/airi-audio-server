@@ -1,0 +1,7 @@
+node_modules/
+temp_uploads/
+test_output.ogg
+*.wav
+*.ogg
+.env
+.DS_Store

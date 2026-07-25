@@ -1,0 +1,26 @@
+{
+  "port": 8095,
+  "host": "0.0.0.0",
+  "audio_cpp": {
+    "server_exe": "C:/Users/h4rdc/Documents/Github/coding-agent/audio.cpp/build/windows-cuda-release/bin/audiocpp_server.exe",
+    "working_dir": "C:/Users/h4rdc/Documents/Github/coding-agent/audio.cpp",
+    "internal_port": 8080
+  },
+  "whisper_cpp": {
+    "cli_exe": "C:/Users/h4rdc/Documents/Github/coding-agent/audio.cpp/build/windows-cuda-release/bin/whisper_cli.exe",
+    "model_path": "C:/Users/h4rdc/Documents/Github/coding-agent/audio.cpp/models/whisper-small.bin"
+  },
+  "installed_models": ["omnivoice-tts", "fish-audio-tts"],
+  "models": {
+    "omnivoice-tts": {
+      "family": "omnivoice",
+      "path": "C:/Users/h4rdc/Documents/Github/coding-agent/audio.cpp/models/OmniVoice-GGUF/omnivoice-q8_0.gguf",
+      "allow_unfiltered_tags": false
+    },
+    "fish-audio-tts": {
+      "family": "fish_audio",
+      "path": "C:/Users/h4rdc/Documents/Github/coding-agent/audio.cpp/models/Fish-Audio-S2-Pro-GGUF/fish-audio-s2-pro-q8_0.gguf",
+      "allow_unfiltered_tags": true
+    }
+  }
+}

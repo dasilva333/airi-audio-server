@@ -120,6 +120,23 @@ function downloadFile(url, targetPath) {
   });
 }
 
+function ensureModelSidecars(modelPath, family) {
+  const dir = path.dirname(modelPath);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+
+  const configFile = path.join(dir, 'config.json');
+  if (!fs.existsSync(configFile)) {
+    const sidecarConfig = {
+      family: family,
+      model_type: family
+    };
+    fs.writeFileSync(configFile, JSON.stringify(sidecarConfig, null, 2), 'utf-8');
+    console.log(`[Setup] Auto-created missing sidecar config at: ${configFile}`);
+  }
+}
+
 function runSetup() {
   console.log("=".repeat(60));
   console.log("      AIRI Audio Server - Interactive Model Setup Wizard      ");
@@ -198,6 +215,9 @@ function runSetup() {
           console.log(`You can manually download the .gguf file and place it at: ${resolvedModelPath}`);
         }
       }
+
+      // Auto-ensure sidecar config.json exists in model directory
+      ensureModelSidecars(resolvedModelPath, selected.family);
 
       config.installed_models = [selected.id];
       if (!config.models) config.models = {};

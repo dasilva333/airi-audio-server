@@ -29,7 +29,7 @@
       "allow_unfiltered_tags": true
     },
     "higgs-audio-tts": {
-      "family": "higgs_audio",
+      "family": "higgs_audio_tts",
       "path": "../audio.cpp/models/Higgs-GGUF/higgs-audio-q8_0.gguf",
       "allow_unfiltered_tags": true
     }

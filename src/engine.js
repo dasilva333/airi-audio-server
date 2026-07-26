@@ -87,7 +87,7 @@ class AudioCppEngine {
     const cudaBinPath = this.getCudaPath();
 
     if (!fs.existsSync(resolvedModelPath)) {
-      throw new Error(`Model weights not found at: ${resolvedModelPath}`);
+      throw new Error(`Model weights file (.gguf) not found at:\n  ${resolvedModelPath}\n\nPlease download the .gguf model weights file and place it in that directory.`);
     }
 
     // Stop existing server process if model or voice preset changed

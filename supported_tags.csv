@@ -21,48 +21,48 @@ emotion,surprise-oh,OmniVoice: Surprised oh,omni
 emotion,surprise-wa,OmniVoice: Surprised wa,omni
 emotion,surprise-yo,OmniVoice: Surprised yo,omni
 emotion,dissatisfaction-hnn,OmniVoice: Dissatisfaction hnn,omni
-emotion,emotion:elation,Higgs Audio: Elation,higgs_audio
-emotion,emotion:amusement,Higgs Audio: Amusement,higgs_audio
-emotion,emotion:enthusiasm,Higgs Audio: Enthusiasm,higgs_audio
-emotion,emotion:determination,Higgs Audio: Determination,higgs_audio
-emotion,emotion:pride,Higgs Audio: Pride,higgs_audio
-emotion,emotion:contentment,Higgs Audio: Contentment,higgs_audio
-emotion,emotion:affection,Higgs Audio: Affection,higgs_audio
-emotion,emotion:relief,Higgs Audio: Relief,higgs_audio
-emotion,emotion:contemplation,Higgs Audio: Contemplation,higgs_audio
-emotion,emotion:confusion,Higgs Audio: Confusion,higgs_audio
-emotion,emotion:surprise,Higgs Audio: Surprise,higgs_audio
-emotion,emotion:awe,Higgs Audio: Awe,higgs_audio
-emotion,emotion:longing,Higgs Audio: Longing,higgs_audio
-emotion,emotion:arousal,Higgs Audio: Arousal,higgs_audio
-emotion,emotion:anger,Higgs Audio: Anger,higgs_audio
-emotion,emotion:fear,Higgs Audio: Fear,higgs_audio
-emotion,emotion:disgust,Higgs Audio: Disgust,higgs_audio
-emotion,emotion:bitterness,Higgs Audio: Bitterness,higgs_audio
-emotion,emotion:sadness,Higgs Audio: Sadness,higgs_audio
-emotion,emotion:shame,Higgs Audio: Shame,higgs_audio
-emotion,emotion:helplessness,Higgs Audio: Helplessness,higgs_audio
-sound,sfx:cough,Higgs Audio: Cough,higgs_audio
-sound,sfx:laughter,Higgs Audio: Laughter,higgs_audio
-sound,sfx:crying,Higgs Audio: Crying,higgs_audio
-sound,sfx:screaming,Higgs Audio: Screaming,higgs_audio
-sound,sfx:burping,Higgs Audio: Burping,higgs_audio
-sound,sfx:humming,Higgs Audio: Humming,higgs_audio
-sound,sfx:sigh,Higgs Audio: Sigh,higgs_audio
-sound,sfx:sniff,Higgs Audio: Sniff,higgs_audio
-sound,sfx:sneeze,Higgs Audio: Sneeze,higgs_audio
-style,style:singing,Higgs Audio: Singing style,higgs_audio
-style,style:shouting,Higgs Audio: Shouting style,higgs_audio
-style,style:whispering,Higgs Audio: Whispering style,higgs_audio
-prosody,prosody:speed_very_slow,Higgs Audio: Speed very slow,higgs_audio
-prosody,prosody:speed_slow,Higgs Audio: Speed slow,higgs_audio
-prosody,prosody:speed_fast,Higgs Audio: Speed fast,higgs_audio
-prosody,prosody:speed_very_fast,Higgs Audio: Speed very fast,higgs_audio
-prosody,prosody:pitch_low,Higgs Audio: Pitch low,higgs_audio
-prosody,prosody:pitch_high,Higgs Audio: Pitch high,higgs_audio
-prosody,prosody:expressive_high,Higgs Audio: Expressive high,higgs_audio
-prosody,prosody:expressive_low,Higgs Audio: Expressive low,higgs_audio
-prosody,prosody:pause,Higgs Audio: Pause,higgs_audio
-prosody,prosody:long_pause,Higgs Audio: Long pause,higgs_audio
-environment,env:music,Higgs Audio: Music environment,higgs_audio
-environment,env:noise,Higgs Audio: Background noise environment,higgs_audio
+emotion,emotion:elation,Higgs Audio: Elation,higgs_audio,higgs_audio_tts
+emotion,emotion:amusement,Higgs Audio: Amusement,higgs_audio,higgs_audio_tts
+emotion,emotion:enthusiasm,Higgs Audio: Enthusiasm,higgs_audio,higgs_audio_tts
+emotion,emotion:determination,Higgs Audio: Determination,higgs_audio,higgs_audio_tts
+emotion,emotion:pride,Higgs Audio: Pride,higgs_audio,higgs_audio_tts
+emotion,emotion:contentment,Higgs Audio: Contentment,higgs_audio,higgs_audio_tts
+emotion,emotion:affection,Higgs Audio: Affection,higgs_audio,higgs_audio_tts
+emotion,emotion:relief,Higgs Audio: Relief,higgs_audio,higgs_audio_tts
+emotion,emotion:contemplation,Higgs Audio: Contemplation,higgs_audio,higgs_audio_tts
+emotion,emotion:confusion,Higgs Audio: Confusion,higgs_audio,higgs_audio_tts
+emotion,emotion:surprise,Higgs Audio: Surprise,higgs_audio,higgs_audio_tts
+emotion,emotion:awe,Higgs Audio: Awe,higgs_audio,higgs_audio_tts
+emotion,emotion:longing,Higgs Audio: Longing,higgs_audio,higgs_audio_tts
+emotion,emotion:arousal,Higgs Audio: Arousal,higgs_audio,higgs_audio_tts
+emotion,emotion:anger,Higgs Audio: Anger,higgs_audio,higgs_audio_tts
+emotion,emotion:fear,Higgs Audio: Fear,higgs_audio,higgs_audio_tts
+emotion,emotion:disgust,Higgs Audio: Disgust,higgs_audio,higgs_audio_tts
+emotion,emotion:bitterness,Higgs Audio: Bitterness,higgs_audio,higgs_audio_tts
+emotion,emotion:sadness,Higgs Audio: Sadness,higgs_audio,higgs_audio_tts
+emotion,emotion:shame,Higgs Audio: Shame,higgs_audio,higgs_audio_tts
+emotion,emotion:helplessness,Higgs Audio: Helplessness,higgs_audio,higgs_audio_tts
+sound,sfx:cough,Higgs Audio: Cough,higgs_audio,higgs_audio_tts
+sound,sfx:laughter,Higgs Audio: Laughter,higgs_audio,higgs_audio_tts
+sound,sfx:crying,Higgs Audio: Crying,higgs_audio,higgs_audio_tts
+sound,sfx:screaming,Higgs Audio: Screaming,higgs_audio,higgs_audio_tts
+sound,sfx:burping,Higgs Audio: Burping,higgs_audio,higgs_audio_tts
+sound,sfx:humming,Higgs Audio: Humming,higgs_audio,higgs_audio_tts
+sound,sfx:sigh,Higgs Audio: Sigh,higgs_audio,higgs_audio_tts
+sound,sfx:sniff,Higgs Audio: Sniff,higgs_audio,higgs_audio_tts
+sound,sfx:sneeze,Higgs Audio: Sneeze,higgs_audio,higgs_audio_tts
+style,style:singing,Higgs Audio: Singing style,higgs_audio,higgs_audio_tts
+style,style:shouting,Higgs Audio: Shouting style,higgs_audio,higgs_audio_tts
+style,style:whispering,Higgs Audio: Whispering style,higgs_audio,higgs_audio_tts
+prosody,prosody:speed_very_slow,Higgs Audio: Speed very slow,higgs_audio,higgs_audio_tts
+prosody,prosody:speed_slow,Higgs Audio: Speed slow,higgs_audio,higgs_audio_tts
+prosody,prosody:speed_fast,Higgs Audio: Speed fast,higgs_audio,higgs_audio_tts
+prosody,prosody:speed_very_fast,Higgs Audio: Speed very fast,higgs_audio,higgs_audio_tts
+prosody,prosody:pitch_low,Higgs Audio: Pitch low,higgs_audio,higgs_audio_tts
+prosody,prosody:pitch_high,Higgs Audio: Pitch high,higgs_audio,higgs_audio_tts
+prosody,prosody:expressive_high,Higgs Audio: Expressive high,higgs_audio,higgs_audio_tts
+prosody,prosody:expressive_low,Higgs Audio: Expressive low,higgs_audio,higgs_audio_tts
+prosody,prosody:pause,Higgs Audio: Pause,higgs_audio,higgs_audio_tts
+prosody,prosody:long_pause,Higgs Audio: Long pause,higgs_audio,higgs_audio_tts
+environment,env:music,Higgs Audio: Music environment,higgs_audio,higgs_audio_tts
+environment,env:noise,Higgs Audio: Background noise environment,higgs_audio,higgs_audio_tts

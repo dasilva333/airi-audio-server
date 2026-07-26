@@ -6,7 +6,7 @@ import subprocess
 import urllib.request
 
 SERVER_CMD = ["node", "src/server.js"]
-CWD = r"c:\Users\h4rdc\Documents\Github\coding-agent\airi-audio-server"
+CWD = os.path.dirname(os.path.abspath(__file__))
 PORT = 8095
 
 def test_airi_audio_server():
@@ -68,7 +68,7 @@ def test_airi_audio_server():
         with urllib.request.urlopen(req_speech, timeout=120.0) as resp_speech:
             audio_bytes = resp_speech.read()
             elapsed = round(time.perf_counter() - t_start, 3)
-            out_file = r"c:\Users\h4rdc\Documents\Github\coding-agent\airi-audio-server\test_output.ogg"
+            out_file = os.path.join(CWD, "test_output.ogg")
             with open(out_file, "wb") as f:
                 f.write(audio_bytes)
 

@@ -2,23 +2,36 @@ const { spawn } = require('child_process');
 const path = require('path');
 const os = require('os');
 
+function resolvePath(relativePath) {
+  if (!relativePath) return '';
+  if (path.isAbsolute(relativePath)) return relativePath;
+  return path.resolve(__dirname, '..', relativePath);
+}
+
 function runWhisperStt(audioPath, whisperConfig) {
   return new Promise((resolve, reject) => {
-    const cudaPath = "C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v13.1\\bin\\x64";
+    const resolvedCli = resolvePath(whisperConfig.cli_exe);
+    const resolvedModel = resolvePath(whisperConfig.model_path);
+    const resolvedAudio = resolvePath(audioPath);
+
+    const cudaPath = process.env.CUDA_PATH 
+      ? path.join(process.env.CUDA_PATH, 'bin')
+      : "C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v13.1\\bin\\x64";
+
     const env = {
       ...process.env,
       PATH: `${cudaPath};${process.env.PATH}`
     };
 
-    console.log(`[Whisper.cpp GPU] Transcribing: ${path.basename(audioPath)}...`);
+    console.log(`[Whisper.cpp GPU] Transcribing: ${path.basename(resolvedAudio)}...`);
     const args = [
-      '-m', whisperConfig.model_path,
-      '-f', audioPath,
+      '-m', resolvedModel,
+      '-f', resolvedAudio,
       '-nt', // No timestamps
       '--language', 'en'
     ];
 
-    const proc = spawn(whisperConfig.cli_exe, args, { env });
+    const proc = spawn(resolvedCli, args, { env });
     let stdout = '';
     let stderr = '';
 

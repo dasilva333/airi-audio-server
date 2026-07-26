@@ -12,6 +12,12 @@ class AudioCppEngine {
     this.activeVoice = null;
   }
 
+  resolvePath(relativePath) {
+    if (!relativePath) return '';
+    if (path.isAbsolute(relativePath)) return relativePath;
+    return path.resolve(__dirname, '..', relativePath);
+  }
+
   getDefaultModelId() {
     if (this.config.installed_models && this.config.installed_models.length > 0) {
       return this.config.installed_models[0];
@@ -34,8 +40,18 @@ class AudioCppEngine {
       throw new Error(`Config error: Model '${modelId}' not registered in config.json`);
     }
 
+    const resolvedWorkingDir = this.resolvePath(this.config.audio_cpp.working_dir);
+    const resolvedServerExe = this.resolvePath(this.config.audio_cpp.server_exe);
+    const resolvedModelPath = this.resolvePath(modelConfig.path);
+    const resolvedVoiceRef = voiceRef ? this.resolvePath(voiceRef) : null;
+
+    // Ensure working directory exists
+    if (!fs.existsSync(resolvedWorkingDir)) {
+      fs.mkdirSync(resolvedWorkingDir, { recursive: true });
+    }
+
     // Stop existing server process if model or voice preset changed
-    if (this.process && (this.activeModel !== modelId || this.activeVoice !== voiceRef)) {
+    if (this.process && (this.activeModel !== modelId || this.activeVoice !== resolvedVoiceRef)) {
       console.log(`[Engine] Hot-swapping audio.cpp for model '${modelId}'...`);
       this.stop();
     }
@@ -44,7 +60,7 @@ class AudioCppEngine {
       return modelId;
     }
 
-    const tempConfigPath = path.join(this.config.audio_cpp.working_dir, 'server.json');
+    const tempConfigPath = path.join(resolvedWorkingDir, 'server.json');
     const serverConfig = {
       host: '127.0.0.1',
       port: this.config.audio_cpp.internal_port,
@@ -56,16 +72,16 @@ class AudioCppEngine {
         {
           id: modelId,
           family: modelConfig.family,
-          path: modelConfig.path,
+          path: resolvedModelPath,
           task: 'tts',
           mode: 'offline',
           session_options: {
             cuda_graphs: 'true',
             mem_saver: 'true'
           },
-          ...(voiceRef ? {
+          ...(resolvedVoiceRef ? {
             default_voice_preset: {
-              voice_ref: voiceRef,
+              voice_ref: resolvedVoiceRef,
               reference_text: referenceText || ''
             }
           } : {})
@@ -73,22 +89,29 @@ class AudioCppEngine {
       ]
     };
 
+    // Auto-create/write server.json
     fs.writeFileSync(tempConfigPath, JSON.stringify(serverConfig, null, 2), 'utf-8');
 
     console.log(`[Engine] Spawning audiocpp_server.exe (${modelId})...`);
-    const cudaPath = "C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v13.1\\bin\\x64";
+    console.log(`[Engine] Executable: ${resolvedServerExe}`);
+    console.log(`[Engine] Config: ${tempConfigPath}`);
+
+    const cudaPath = process.env.CUDA_PATH 
+      ? path.join(process.env.CUDA_PATH, 'bin')
+      : "C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v13.1\\bin\\x64";
+      
     const env = {
       ...process.env,
       PATH: `${cudaPath};${process.env.PATH}`
     };
 
-    this.process = spawn(this.config.audio_cpp.server_exe, ['--config', tempConfigPath], {
-      cwd: this.config.audio_cpp.working_dir,
+    this.process = spawn(resolvedServerExe, ['--config', tempConfigPath], {
+      cwd: resolvedWorkingDir,
       env
     });
 
     this.activeModel = modelId;
-    this.activeVoice = voiceRef;
+    this.activeVoice = resolvedVoiceRef;
 
     this.process.stdout.on('data', (data) => {
       const line = data.toString().trim();
@@ -147,10 +170,12 @@ class AudioCppEngine {
   async synthesize(promptInput, modelIdInput = null, voiceRef = null, referenceText = '') {
     const resolvedModelId = await this.initialize(modelIdInput, voiceRef, referenceText);
 
+    const resolvedVoiceRef = voiceRef ? this.resolvePath(voiceRef) : null;
+
     const payload = JSON.stringify({
       model: resolvedModelId,
       input: promptInput,
-      ...(voiceRef ? { voice_ref: voiceRef, reference_text: referenceText } : {})
+      ...(resolvedVoiceRef ? { voice_ref: resolvedVoiceRef, reference_text: referenceText } : {})
     });
 
     return new Promise((resolve, reject) => {

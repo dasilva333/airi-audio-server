@@ -3,13 +3,21 @@ const path = require('path');
 const { normalizeAudioToWav, ensureOptimalAudioLength } = require('./ffmpeg');
 const { runWhisperStt } = require('./stt');
 
+function resolvePath(relativePath) {
+  if (!relativePath) return '';
+  if (path.isAbsolute(relativePath)) return relativePath;
+  return path.resolve(__dirname, '..', relativePath);
+}
+
 class VoiceManager {
-  constructor(voicesDir, vocabularyPath, whisperConfig) {
-    this.voicesDir = voicesDir;
-    this.vocabularyPath = vocabularyPath;
+  constructor(voicesDir, vocabularyPath, whisperConfig, chatterboxDir = '../chatterbox/voices') {
+    this.voicesDir = resolvePath(voicesDir);
+    this.vocabularyPath = resolvePath(vocabularyPath);
+    this.chatterboxDir = resolvePath(chatterboxDir);
     this.whisperConfig = whisperConfig;
     this.vocabulary = {};
     
+    // Auto-create voicesDir if missing
     if (!fs.existsSync(this.voicesDir)) {
       fs.mkdirSync(this.voicesDir, { recursive: true });
     }
@@ -25,10 +33,18 @@ class VoiceManager {
         console.error(`[Voices] Error loading vocabulary: ${err.message}`);
         this.vocabulary = {};
       }
+    } else {
+      // Auto-initialize vocabulary file if missing
+      this.vocabulary = {};
+      this.saveVocabulary();
     }
   }
 
   saveVocabulary() {
+    const dir = path.dirname(this.vocabularyPath);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
     fs.writeFileSync(this.vocabularyPath, JSON.stringify(this.vocabulary, null, 2), 'utf-8');
   }
 
@@ -43,10 +59,11 @@ class VoiceManager {
     }
 
     // 2. Check fallback chatterbox voices
-    const chatterboxVoices = path.join("C:\\Users\\h4rdc\\Documents\\Github\\coding-agent\\chatterbox\\voices");
-    for (const ext of extensions) {
-      const candidate = path.join(chatterboxVoices, `${voiceId}${ext}`);
-      if (fs.existsSync(candidate)) return candidate;
+    if (fs.existsSync(this.chatterboxDir)) {
+      for (const ext of extensions) {
+        const candidate = path.join(this.chatterboxDir, `${voiceId}${ext}`);
+        if (fs.existsSync(candidate)) return candidate;
+      }
     }
 
     return null;
@@ -91,8 +108,11 @@ class VoiceManager {
     if (!voiceId) return null;
 
     // Check vocabulary first
-    if (this.vocabulary[voiceId] && fs.existsSync(this.vocabulary[voiceId].file)) {
-      return this.vocabulary[voiceId];
+    if (this.vocabulary[voiceId] && fs.existsSync(resolvePath(this.vocabulary[voiceId].file))) {
+      return {
+        file: resolvePath(this.vocabulary[voiceId].file),
+        transcript: this.vocabulary[voiceId].transcript
+      };
     }
 
     const file = this.getVoiceFile(voiceId);
@@ -119,7 +139,7 @@ class VoiceManager {
     };
 
     checkDir(this.voicesDir);
-    checkDir(path.join("C:\\Users\\h4rdc\\Documents\\Github\\coding-agent\\chatterbox\\voices"));
+    checkDir(this.chatterboxDir);
     return Array.from(list);
   }
 

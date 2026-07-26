@@ -1,13 +1,13 @@
 category,tag,description,type
-emotion,laughter,Spoken laughter,both
-emotion,sigh,Soft reflective release,both
-emotion,gasp,Sharp intake from surprise or shock,both
-emotion,groan,Low vocal complaint or strain,both
-sound,cough,Audible cough,both
-sound,clear_throat,Audible throat clearing,both
-sound,sniff,Audible sniff,both
-sound,shhh,Silencing sound,both
-sound,chuckle,Quiet laughter,both
+emotion,laughter,Spoken laughter,chatterbox,chatterbox_turbo
+emotion,sigh,Soft reflective release,chatterbox,chatterbox_turbo
+emotion,gasp,Sharp intake from surprise or shock,chatterbox,chatterbox_turbo
+emotion,groan,Low vocal complaint or strain,chatterbox,chatterbox_turbo
+sound,cough,Audible cough,chatterbox,chatterbox_turbo
+sound,clear_throat,Audible throat clearing,chatterbox,chatterbox_turbo
+sound,sniff,Audible sniff,chatterbox,chatterbox_turbo
+sound,shhh,Silencing sound,chatterbox,chatterbox_turbo
+sound,chuckle,Quiet laughter,chatterbox,chatterbox_turbo
 emotion,laughter,OmniVoice: Native laughter,omni
 emotion,sigh,OmniVoice: Native sigh,omni
 emotion,confirmation-en,OmniVoice: English confirmation,omni

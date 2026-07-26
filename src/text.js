@@ -6,7 +6,8 @@ const EMOJI_REGEX = /(?!\d)[\u{1F000}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF
 
 class TextProcessor {
   constructor(tagsCsvPath) {
-    this.validTags = new Set();
+    this.modelTags = new Map(); // modelName -> Set of valid tags
+    this.allValidTags = new Set();
     this.loadSupportedTags(tagsCsvPath);
   }
 
@@ -16,18 +17,40 @@ class TextProcessor {
         const content = fs.readFileSync(csvPath, 'utf-8');
         const lines = content.split('\n');
         for (let i = 1; i < lines.length; i++) {
-          const parts = lines[i].split(',');
-          if (parts.length >= 2) {
+          const line = lines[i].trim();
+          if (!line) continue;
+          const parts = line.split(',');
+          if (parts.length >= 4) {
             const rawTag = parts[1].trim().toLowerCase();
-            if (rawTag) {
-              this.validTags.add(rawTag);
-              this.validTags.add(`[${rawTag}]`);
-              this.validTags.add(`[${rawTag.replace(/_/g, ' ')}]`);
-              this.validTags.add(`<|${rawTag}|>`);
+            if (!rawTag) continue;
+
+            // Support comma-delimited model names in type column (e.g. "chatterbox,chatterbox_turbo")
+            const types = parts.slice(3).join(',').split(',').map(t => t.trim().toLowerCase());
+
+            const tagVariations = [
+              rawTag,
+              `[${rawTag}]`,
+              `[${rawTag.replace(/_/g, ' ')}]`,
+              `<|${rawTag}|>`
+            ];
+
+            for (const v of tagVariations) {
+              this.allValidTags.add(v);
+            }
+
+            for (const t of types) {
+              if (!t) continue;
+              if (!this.modelTags.has(t)) {
+                this.modelTags.set(t, new Set());
+              }
+              const modelSet = this.modelTags.get(t);
+              for (const v of tagVariations) {
+                modelSet.add(v);
+              }
             }
           }
         }
-        console.log(`[TextProcessor] Loaded ${this.validTags.size} supported tag variations.`);
+        console.log(`[TextProcessor] Loaded tag mappings for ${this.modelTags.size} model families (${this.allValidTags.size} total tag variations).`);
       } catch (err) {
         console.error(`[TextProcessor] Error reading supported_tags.csv: ${err.message}`);
       }
@@ -45,24 +68,28 @@ class TextProcessor {
     return text.replace(EMOJI_REGEX, '').trim();
   }
 
-  filterBracketedTags(text, allowUnfiltered = false) {
+  filterBracketedTags(text, modelFamily = 'omnivoice', allowUnfiltered = false) {
     if (!text) return '';
     if (allowUnfiltered) {
       return text;
     }
-    // Filter both [tag] and <|tag|> bracket formats
+
+    const familyKey = (modelFamily || 'omnivoice').toLowerCase().replace('-', '_');
+    const validSet = this.modelTags.get(familyKey) || this.modelTags.get('omni') || this.allValidTags;
+
+    // Filter both [tag] and <|tag|> bracket formats based on model-specific tag set
     return text.replace(/(\[[^\]]+\]|<\|[^|]+\|>)/g, (match) => {
       const normalized = match.trim().toLowerCase();
-      if (this.validTags.has(normalized)) {
+      if (validSet.has(normalized)) {
         return match;
       }
       return ' ';
     }).replace(/\s+/g, ' ').trim();
   }
 
-  process(text, allowUnfiltered = false) {
+  process(text, modelFamily = 'omnivoice', allowUnfiltered = false) {
     let cleaned = this.cleanEmoji(text);
-    cleaned = this.filterBracketedTags(cleaned, allowUnfiltered);
+    cleaned = this.filterBracketedTags(cleaned, modelFamily, allowUnfiltered);
     return cleaned;
   }
 }

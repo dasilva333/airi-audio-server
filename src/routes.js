@@ -130,8 +130,8 @@ function createRouter(engine, voiceManager, textProcessor, gpuQueue, config) {
       const modelCfg = config.models[modelId] || {};
       const shouldBypass = allow_unfiltered_tags || modelCfg.allow_unfiltered_tags || false;
 
-      // Clean emojis & filter/preserve tags
-      const cleanedInput = textProcessor.process(input, shouldBypass);
+      // Clean emojis & filter/preserve tags based on model family
+      const cleanedInput = textProcessor.process(input, modelCfg.family, shouldBypass);
 
       console.log(`[API] Speech Request: model='${modelId}', voice='${voice}', fmt='${response_format}'`);
       const tStart = Date.now();

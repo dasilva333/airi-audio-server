@@ -35,7 +35,7 @@ const MODEL_CATALOG = [
     vram: "~4.80 GB",
     features: "46 Native Paralinguistic Tags (<|emotion:...|>), Zero-Shot Voice Cloning",
     relPath: "models/Higgs-GGUF/higgs-audio-q8_0.gguf",
-    downloadUrl: "https://huggingface.co/audio-cpp/audio.cpp-gguf/resolve/main/Higgs-GGUF/higgs-audio-q8_0.gguf"
+    downloadUrl: null
   },
   {
     num: "4",
@@ -45,7 +45,7 @@ const MODEL_CATALOG = [
     vram: "~0.85 GB",
     features: "Ultra-Lightweight Speech Model",
     relPath: "models/Kokoro-GGUF/kokoro-q8_0.gguf",
-    downloadUrl: "https://huggingface.co/audio-cpp/audio.cpp-gguf/resolve/main/Kokoro-GGUF/kokoro-q8_0.gguf"
+    downloadUrl: null
   },
   {
     num: "5",
@@ -55,7 +55,7 @@ const MODEL_CATALOG = [
     vram: "~3.50 GB",
     features: "Multilingual Voice Synthesis",
     relPath: "models/Qwen-GGUF/qwen-q8_0.gguf",
-    downloadUrl: "https://huggingface.co/audio-cpp/audio.cpp-gguf/resolve/main/Qwen-GGUF/qwen-q8_0.gguf"
+    downloadUrl: null
   }
 ];
 
@@ -108,7 +108,7 @@ function downloadFile(url, targetPath) {
         });
 
         response.on('error', (err) => {
-          fs.unlinkSync(targetPath);
+          try { fs.unlinkSync(targetPath); } catch (e) {}
           reject(err);
         });
       }).on('error', (err) => {
@@ -191,8 +191,12 @@ function runSetup() {
     console.log("\nSelect the primary TTS model to enable for AIRI Audio Server:\n");
     MODEL_CATALOG.forEach(m => {
       const fullPath = path.join(audioCppDir, m.relPath);
-      const exists = fs.existsSync(resolvePath(fullPath)) ? "✓ Found" : "✗ Missing (Auto-Download Available)";
-      console.log(`  [${m.num}] ${m.name} (${exists})`);
+      const isPresent = fs.existsSync(resolvePath(fullPath));
+      let statusStr = "✓ Found";
+      if (!isPresent) {
+        statusStr = m.downloadUrl ? "✗ Missing (Auto-Download Verified)" : "✗ Missing (Manual Download Required)";
+      }
+      console.log(`  [${m.num}] ${m.name} (${statusStr})`);
       console.log(`      VRAM: ${m.vram} | Features: ${m.features}`);
       console.log(`      Path: ${fullPath}\n`);
     });
@@ -206,7 +210,7 @@ function runSetup() {
       const modelFullPath = path.join(audioCppDir, selected.relPath);
       const resolvedModelPath = resolvePath(modelFullPath);
 
-      // Auto-download missing GGUF weights
+      // Auto-download missing GGUF weights only for verified URLs
       if (!fs.existsSync(resolvedModelPath) && selected.downloadUrl) {
         try {
           await downloadFile(selected.downloadUrl, resolvedModelPath);

@@ -34,8 +34,8 @@ const MODEL_CATALOG = [
     family: "higgs_audio_tts",
     vram: "~4.80 GB",
     features: "46 Native Paralinguistic Tags (<|emotion:...|>), Zero-Shot Voice Cloning",
-    relPath: "models/Higgs-GGUF/higgs-audio-q8_0.gguf",
-    downloadUrl: null
+    relPath: "models/Higgs-GGUF/higgs-audio-v3-tts-4b-q8_0.gguf",
+    downloadUrl: "https://huggingface.co/audio-cpp/audio.cpp-gguf/resolve/main/Higgs-Audio-v3-TTS-4B-GGUF/higgs-audio-v3-tts-4b-q8_0.gguf"
   },
   {
     num: "4",

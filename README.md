@@ -6,7 +6,27 @@
 
 ---
 
-## ⚡ Core Features & Architectural Superiority
+## 📦 Prerequisites & Requirements
+
+`airi-audio-server` is the Node.js API layer that connects to the high-performance C++ `audio.cpp` inference engine. To run speech synthesis, you need the compiled `audiocpp_server.exe` C++ executable and model weight `.gguf` files.
+
+### Option A: Standard Sibling Directory Layout (Default)
+Place `audio.cpp` in a sibling folder alongside `airi-audio-server`:
+```text
+/your-parent-folder/
+├── airi-audio-server/
+└── audio.cpp/
+    ├── build/windows-cuda-release/bin/audiocpp_server.exe
+    └── models/
+        └── OmniVoice-GGUF/omnivoice-q8_0.gguf
+```
+
+### Option B: Custom Existing `audio.cpp` Installation
+If `audio.cpp` is located in another folder on your computer (e.g. `C:\Tools\audio.cpp`), simply update `config.json` or run `install.bat` / `node setup.js` — the wizard will prompt you to enter your custom folder path!
+
+---
+
+## ⚡ Core Features
 
 1. **Zero Python Overhead**: Runs pure compiled C++ binaries (`audiocpp_server.exe` and `whisper_cli.exe`) bound to CUDA GPU.
 2. **Unified Serialized GPU Queue (`src/queue.js`)**: Single FIFO queue for all GPU tasks (TTS synthesis, STT transcriptions, voice registrations), preventing VRAM collisions and CUDA context corruption.
@@ -21,7 +41,7 @@
 
 ## 🛠️ Configuration Guide (`config.json`)
 
-All configuration parameters are fully exposed and customizable in `config.json`. No paths or CUDA settings are hidden in code:
+All configuration parameters are fully exposed and customizable in `config.json`:
 
 ```json
 {
@@ -71,6 +91,8 @@ Run the interactive setup installer:
 install.bat
 ```
 *(or run `npm run setup`)*
+
+The installer will automatically verify your `audio.cpp` installation and prompt you for custom folder locations if needed.
 
 ### 2. Start the Server
 ```cmd

@@ -36,7 +36,11 @@ function convertWavToOgg(wavBuffer) {
 
 function normalizeAudioToWav(inputPath, outputPath) {
   return new Promise((resolve, reject) => {
-    // 1. Convert to 24kHz mono PCM WAV
+    if (!fs.existsSync(inputPath)) {
+      return reject(new Error(`Audio reference file not found: ${inputPath}`));
+    }
+
+    let stderr = '';
     const ffmpeg = spawn('ffmpeg', [
       '-y',
       '-i', inputPath,
@@ -46,19 +50,30 @@ function normalizeAudioToWav(inputPath, outputPath) {
       outputPath
     ]);
 
+    ffmpeg.stderr.on('data', d => stderr += d.toString());
+
     ffmpeg.on('close', (code) => {
       if (code !== 0) {
-        return reject(new Error(`FFmpeg failed to convert ${inputPath} to WAV`));
+        return reject(new Error(`FFmpeg conversion failed for '${path.basename(inputPath)}'.\nFFmpeg Log: ${stderr.trim() || 'Exit code ' + code}`));
+      }
+      if (!fs.existsSync(outputPath) || fs.statSync(outputPath).size === 0) {
+        return reject(new Error(`FFmpeg output file '${outputPath}' is missing or empty.`));
       }
       resolve(outputPath);
     });
 
-    ffmpeg.on('error', reject);
+    ffmpeg.on('error', (err) => {
+      reject(new Error(`Failed to execute FFmpeg binary: ${err.message}`));
+    });
   });
 }
 
 function ensureOptimalAudioLength(wavPath) {
   return new Promise((resolve, reject) => {
+    if (!fs.existsSync(wavPath)) {
+      return resolve(wavPath);
+    }
+
     // Inspect duration using ffprobe
     const ffprobe = spawn('ffprobe', [
       '-v', 'error',

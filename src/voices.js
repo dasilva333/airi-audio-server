@@ -55,14 +55,14 @@ class VoiceManager {
     // 1. Check inside local voicesDir
     for (const ext of extensions) {
       const candidate = path.join(this.voicesDir, `${voiceId}${ext}`);
-      if (fs.existsSync(candidate)) return candidate;
+      if (fs.existsSync(candidate) && fs.statSync(candidate).size > 0) return candidate;
     }
 
     // 2. Check fallback chatterbox voices
     if (fs.existsSync(this.chatterboxDir)) {
       for (const ext of extensions) {
         const candidate = path.join(this.chatterboxDir, `${voiceId}${ext}`);
-        if (fs.existsSync(candidate)) return candidate;
+        if (fs.existsSync(candidate) && fs.statSync(candidate).size > 0) return candidate;
       }
     }
 
@@ -70,6 +70,10 @@ class VoiceManager {
   }
 
   async ingestVoiceAudio(inputPath, voiceId) {
+    if (!fs.existsSync(inputPath)) {
+      throw new Error(`Voice upload reference file missing: ${inputPath}`);
+    }
+
     // Enforce Strict Hidden Rule: Prevent duplicate basenames
     const existingFile = this.getVoiceFile(voiceId);
     let targetWavPath = path.join(this.voicesDir, `${voiceId}.wav`);
@@ -109,10 +113,13 @@ class VoiceManager {
 
     // Check vocabulary first
     if (this.vocabulary[voiceId] && fs.existsSync(resolvePath(this.vocabulary[voiceId].file))) {
-      return {
-        file: resolvePath(this.vocabulary[voiceId].file),
-        transcript: this.vocabulary[voiceId].transcript
-      };
+      const vocabFile = resolvePath(this.vocabulary[voiceId].file);
+      if (fs.statSync(vocabFile).size > 0) {
+        return {
+          file: vocabFile,
+          transcript: this.vocabulary[voiceId].transcript
+        };
+      }
     }
 
     const file = this.getVoiceFile(voiceId);

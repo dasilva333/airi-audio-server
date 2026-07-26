@@ -26,6 +26,20 @@ class AudioCppEngine {
     return path.resolve(__dirname, '..', relativePath);
   }
 
+  getServerExePath() {
+    if (this.config.audio_cpp?.server_exe) {
+      const configuredPath = this.resolvePath(this.config.audio_cpp.server_exe);
+      if (fs.existsSync(configuredPath)) return configuredPath;
+    }
+    // Bundled Pre-built Binary Fallback
+    const bundledPath = path.resolve(__dirname, '../bin/windows-cuda/audiocpp_server.exe');
+    if (fs.existsSync(bundledPath)) {
+      console.log(`[Engine] Using bundled pre-compiled binary: ${bundledPath}`);
+      return bundledPath;
+    }
+    throw new Error(`audiocpp_server executable not found.`);
+  }
+
   getCudaPath() {
     if (this.config.cuda_path) {
       return this.resolvePath(this.config.cuda_path);
@@ -62,23 +76,18 @@ class AudioCppEngine {
       throw new Error(`Config error: Model '${modelId}' not registered in config.json`);
     }
 
-    const resolvedWorkingDir = this.resolvePath(this.config.audio_cpp.working_dir);
-    const resolvedServerExe = this.resolvePath(this.config.audio_cpp.server_exe);
+    const resolvedServerExe = this.getServerExePath();
+    let resolvedWorkingDir = this.resolvePath(this.config.audio_cpp?.working_dir || "../audio.cpp");
+    if (!fs.existsSync(resolvedWorkingDir)) {
+      resolvedWorkingDir = path.dirname(resolvedServerExe);
+    }
+
     const resolvedModelPath = this.resolvePath(modelConfig.path);
     const resolvedVoiceRef = voiceRef ? this.resolvePath(voiceRef) : null;
     const cudaBinPath = this.getCudaPath();
 
-    if (!fs.existsSync(resolvedServerExe)) {
-      throw new Error(`audiocpp_server executable not found at: ${resolvedServerExe}`);
-    }
-
     if (!fs.existsSync(resolvedModelPath)) {
       throw new Error(`Model weights not found at: ${resolvedModelPath}`);
-    }
-
-    // Ensure working directory exists
-    if (!fs.existsSync(resolvedWorkingDir)) {
-      fs.mkdirSync(resolvedWorkingDir, { recursive: true });
     }
 
     // Stop existing server process if model or voice preset changed
@@ -95,7 +104,7 @@ class AudioCppEngine {
     const tempConfigPath = path.join(resolvedWorkingDir, 'server.json');
     const serverConfig = {
       host: '127.0.0.1',
-      port: this.config.audio_cpp.internal_port,
+      port: this.config.audio_cpp?.internal_port || 8080,
       backend: 'cuda',
       device: 0,
       threads: 4,
@@ -193,7 +202,7 @@ class AudioCppEngine {
       }
       try {
         const ok = await new Promise((resolve) => {
-          const req = http.get(`http://127.0.0.1:${this.config.audio_cpp.internal_port}/health`, (res) => {
+          const req = http.get(`http://127.0.0.1:${this.config.audio_cpp?.internal_port || 8080}/health`, (res) => {
             resolve(res.statusCode === 200);
           });
           req.on('error', () => resolve(false));
@@ -223,7 +232,7 @@ class AudioCppEngine {
     });
 
     return new Promise((resolve, reject) => {
-      const req = http.request(`http://127.0.0.1:${this.config.audio_cpp.internal_port}/v1/audio/speech`, {
+      const req = http.request(`http://127.0.0.1:${this.config.audio_cpp?.internal_port || 8080}/v1/audio/speech`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

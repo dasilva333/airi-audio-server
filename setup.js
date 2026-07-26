@@ -15,7 +15,7 @@ const MODEL_CATALOG = [
     vram: "~1.12 GB",
     features: "Zero-Shot Voice Cloning, Paralinguistic Expression Tags, 0.28 RTF",
     relPath: "models/OmniVoice-GGUF/omnivoice-q8_0.gguf",
-    downloadUrl: "https://huggingface.co/k2-fsa/OmniVoice/resolve/main/omnivoice-q8_0.gguf"
+    downloadUrl: "https://huggingface.co/audio-cpp/audio.cpp-gguf/resolve/main/OmniVoice-GGUF/omnivoice-q8_0.gguf"
   },
   {
     num: "2",
@@ -25,7 +25,7 @@ const MODEL_CATALOG = [
     vram: "~6.31 GB",
     features: "Dual-AR Fast Streaming Synthesis, Zero-Shot Voice Cloning, 1.25 RTF",
     relPath: "models/Fish-Audio-S2-Pro-GGUF/fish-audio-s2-pro-q8_0.gguf",
-    downloadUrl: "https://huggingface.co/rodrigomt/s2-pro-gguf/resolve/main/fish-audio-s2-pro-q8_0.gguf"
+    downloadUrl: "https://huggingface.co/audio-cpp/audio.cpp-gguf/resolve/main/Fish-Audio-S2-Pro-GGUF/fish-audio-s2-pro-q8_0.gguf"
   },
   {
     num: "3",
@@ -35,7 +35,7 @@ const MODEL_CATALOG = [
     vram: "~4.80 GB",
     features: "46 Native Paralinguistic Tags (<|emotion:...|>), Zero-Shot Voice Cloning",
     relPath: "models/Higgs-GGUF/higgs-audio-q8_0.gguf",
-    downloadUrl: "https://huggingface.co/calcuis/higgs-gguf/resolve/main/higgs-audio-q8_0.gguf"
+    downloadUrl: "https://huggingface.co/audio-cpp/audio.cpp-gguf/resolve/main/Higgs-GGUF/higgs-audio-q8_0.gguf"
   },
   {
     num: "4",
@@ -45,7 +45,7 @@ const MODEL_CATALOG = [
     vram: "~0.85 GB",
     features: "Ultra-Lightweight Speech Model",
     relPath: "models/Kokoro-GGUF/kokoro-q8_0.gguf",
-    downloadUrl: "https://huggingface.co/hexgrad/Kokoro-82M/resolve/main/kokoro-q8_0.gguf"
+    downloadUrl: "https://huggingface.co/audio-cpp/audio.cpp-gguf/resolve/main/Kokoro-GGUF/kokoro-q8_0.gguf"
   },
   {
     num: "5",
@@ -55,7 +55,7 @@ const MODEL_CATALOG = [
     vram: "~3.50 GB",
     features: "Multilingual Voice Synthesis",
     relPath: "models/Qwen-GGUF/qwen-q8_0.gguf",
-    downloadUrl: "https://huggingface.co/Qwen/Qwen3-TTS-12Hz-0.6B-Base/resolve/main/qwen-q8_0.gguf"
+    downloadUrl: "https://huggingface.co/audio-cpp/audio.cpp-gguf/resolve/main/Qwen-GGUF/qwen-q8_0.gguf"
   }
 ];
 

@@ -11,7 +11,8 @@
 1. **Zero-Compilation Out-Of-The-Box Execution**:
    - Ships with pre-compiled CUDA release binaries bundled in `bin/windows-cuda/`.
    - If a local `audio.cpp` build is not found, `engine.js` automatically falls back to the bundled C++ server binary, requiring **zero C++/CMake compilation steps** for new users!
-2. **Zero Python Overhead**: Runs pure compiled C++ binaries (`audiocpp_server.exe` and `whisper_cli.exe`) bound to CUDA GPU.
+2. **1-Click Verified Model Auto-Downloader**:
+   - `setup.js` / `install.bat` automatically fetches 100% verified `.gguf` model weights directly from the official [`audio-cpp/audio.cpp-gguf`](https://huggingface.co/audio-cpp/audio.cpp-gguf) HuggingFace repository with live progress tracking.
 3. **28 Official Bundled Reference Voices**: Ships with 28 official reference voice files (`morgan-freeman`, `snoop-dogg`, `trump-2`, `rick_sanchez`, `egirl`, `lain`, `fiona_irish`, etc.) ready for immediate zero-shot cloning.
 4. **Zero File Deletion Policy & Automatic Archiving**:
    - Voice reference files are **never deleted**. Replaced or updated voice files are automatically preserved with timestamped backups in `voices/archive/`.
@@ -25,6 +26,23 @@
 
 ---
 
+## 🎙️ Official Supported TTS Models & 1-Click Auto-Downloader
+
+AIRI Audio Server natively supports the following 5 core TTS models with **1-click automatic downloading**:
+
+| # | Model Name | VRAM | Key Features | HuggingFace GGUF Link |
+| :---: | :--- | :---: | :--- | :--- |
+| **1** | **OmniVoice Q8_0** *(Recommended)* | ~1.12 GB | Zero-Shot Voice Cloning, Paralinguistic Expression Tags, 0.28 RTF | [`audio-cpp-gguf/OmniVoice-GGUF`](https://huggingface.co/audio-cpp/audio.cpp-gguf/resolve/main/OmniVoice-GGUF/omnivoice-q8_0.gguf) |
+| **2** | **Higgs Audio v3 TTS Q8_0** | ~4.80 GB | 46 Native Paralinguistic Tags (`<|emotion:...|>`), Zero-Shot Voice Cloning | [`audio-cpp-gguf/Higgs-Audio-v3-TTS-4B-GGUF`](https://huggingface.co/audio-cpp/audio.cpp-gguf/resolve/main/Higgs-Audio-v3-TTS-4B-GGUF/higgs-audio-v3-tts-4b-q8_0.gguf) |
+| **3** | **Fish Audio S2 Pro Q8_0** | ~6.31 GB | Dual-AR Fast Streaming Synthesis, Zero-Shot Voice Cloning | [`audio-cpp-gguf/Fish-Audio-S2-Pro-GGUF`](https://huggingface.co/audio-cpp/audio.cpp-gguf/resolve/main/Fish-Audio-S2-Pro-GGUF/fish-audio-s2-pro-q8_0.gguf) |
+| **4** | **Chatterbox TTS Q8_0** | ~2.10 GB | High-Fidelity Expressive Speech Synthesis | [`audio-cpp-gguf/Chatterbox-GGUF`](https://huggingface.co/audio-cpp/audio.cpp-gguf/resolve/main/Chatterbox-GGUF/chatterbox-q8_0.gguf) |
+| **5** | **MOSS TTS Local v1.5 Q8_0** | ~7.50 GB | Large Scale Multilingual Neural Speech Model | [`audio-cpp-gguf/MOSS-TTS-Local-v1.5-GGUF`](https://huggingface.co/audio-cpp/audio.cpp-gguf/resolve/main/MOSS-TTS-Local-v1.5-GGUF/moss-tts-local-v1.5-q8_0.gguf) |
+
+> 🌐 **Looking for additional or less common models?**
+> You can find 30+ specialized models (e.g. `PocketTTS`, `MioTTS`, `VibeVoice`, `Supertonic`, `SeedVC`, `Sortformer`) in the official **[`audio-cpp/audio.cpp-gguf`](https://huggingface.co/audio-cpp/audio.cpp-gguf/tree/main)** HuggingFace repository and manually place their `.gguf` weights in `audio.cpp/models/<Model-Name>/`.
+
+---
+
 ## 🚀 1-Click Automated Setup
 
 Double-click `install.bat` on Windows! The installer automatically:
@@ -32,7 +50,7 @@ Double-click `install.bat` on Windows! The installer automatically:
 2. Verifies FFmpeg in system PATH (or offers automatic installation via `winget`).
 3. Clones the official `audio.cpp` C++ engine repository if missing (`git clone https://github.com/0xShug0/audio.cpp`).
 4. Verifies/compiles CUDA release binaries (`cmake -DGGML_CUDA=ON`).
-5. Launches the interactive model setup wizard (`node setup.js`).
+5. Launches the interactive model setup wizard (`node setup.js`), which auto-downloads your selected GGUF model weights!
 
 ```cmd
 install.bat
@@ -59,21 +77,21 @@ All configuration parameters are fully exposed and customizable in `config.json`
     "model_path": "../audio.cpp/models/whisper-small.bin"
   },
   "chatterbox_voices_dir": "../chatterbox/voices",
-  "installed_models": ["omnivoice-tts", "fish-audio-tts", "higgs-audio-tts"],
+  "installed_models": ["omnivoice-tts", "higgs-audio-tts", "fish-audio-tts"],
   "models": {
     "omnivoice-tts": {
       "family": "omnivoice",
       "path": "../audio.cpp/models/OmniVoice-GGUF/omnivoice-q8_0.gguf",
       "allow_unfiltered_tags": false
     },
+    "higgs-audio-tts": {
+      "family": "higgs_audio_tts",
+      "path": "../audio.cpp/models/Higgs-GGUF/higgs-audio-v3-tts-4b-q8_0.gguf",
+      "allow_unfiltered_tags": true
+    },
     "fish-audio-tts": {
       "family": "fish_audio",
       "path": "../audio.cpp/models/Fish-Audio-S2-Pro-GGUF/fish-audio-s2-pro-q8_0.gguf",
-      "allow_unfiltered_tags": true
-    },
-    "higgs-audio-tts": {
-      "family": "higgs_audio",
-      "path": "../audio.cpp/models/Higgs-GGUF/higgs-audio-q8_0.gguf",
       "allow_unfiltered_tags": true
     }
   }
@@ -90,11 +108,11 @@ npm start
 ```
 Starts `airi-audio-server` on `http://localhost:8095`.
 
-### Run Verification Test
+### Run Model Setup Wizard
 ```cmd
-npm test
+npm run setup
 ```
-*(or run `node test.js`)*
+*(or `npm run add-model`)*
 
 ---
 
@@ -116,10 +134,10 @@ npm test
 | Model Family | Code Name (`type`) | Description |
 | :--- | :--- | :--- |
 | **OmniVoice** | `omni` / `omnivoice` | Native laughter, sighs, English confirmation/question tags. |
-| **Chatterbox Full** | `chatterbox` | Spoken laughter, coughs, sighs, gasps. |
-| **Chatterbox Turbo**| `chatterbox_turbo` | Spoken laughter, coughs, sighs, gasps. |
-| **Higgs Audio v3** | `higgs_audio` | 46 Emotion, SFX, Style, Prosody & Noise tags (`<|tag|>`). |
+| **Higgs Audio v3** | `higgs_audio` / `higgs_audio_tts` | 46 Emotion, SFX, Style, Prosody & Noise tags (`<|tag|>`). |
 | **Fish Audio S2 Pro**| `fish_audio` | Full 15K tag bypass enabled (`allow_unfiltered_tags: true`). |
+| **Chatterbox** | `chatterbox` | Spoken laughter, coughs, sighs, gasps. |
+| **MOSS TTS** | `moss_tts` | Multilingual expression and emotion tags. |
 
 ---
 

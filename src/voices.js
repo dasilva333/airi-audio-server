@@ -71,19 +71,20 @@ class VoiceManager {
 
   async ingestVoiceAudio(inputPath, voiceId) {
     if (!fs.existsSync(inputPath)) {
-      throw new Error(`Voice upload reference file missing: ${inputPath}`);
+      throw new Error(`Voice reference file not found: ${inputPath}`);
     }
 
-    // Enforce Strict Hidden Rule: Prevent duplicate basenames
-    const existingFile = this.getVoiceFile(voiceId);
     let targetWavPath = path.join(this.voicesDir, `${voiceId}.wav`);
 
-    if (existingFile && existingFile !== targetWavPath) {
-      console.log(`[Voices] Updating voice '${voiceId}' (replacing ${path.basename(existingFile)})...`);
+    // Strictly ensure we NEVER delete files from chatterboxDir or external folders!
+    const existingFile = this.getVoiceFile(voiceId);
+    const resolvedVoicesDir = path.resolve(this.voicesDir);
+    if (existingFile && existingFile !== targetWavPath && path.resolve(existingFile).startsWith(resolvedVoicesDir)) {
+      console.log(`[Voices] Updating local voice '${voiceId}' (replacing ${path.basename(existingFile)})...`);
       try { fs.unlinkSync(existingFile); } catch (e) {}
     }
 
-    // Step 1: Normalize audio format to 24kHz mono PCM WAV via FFmpeg
+    // Step 1: Normalize audio format to 24kHz mono PCM WAV via FFmpeg into local voicesDir
     await normalizeAudioToWav(inputPath, targetWavPath);
 
     // Step 2: Auto-concatenation if reference audio is too short (< 1.5s)
@@ -125,8 +126,8 @@ class VoiceManager {
     const file = this.getVoiceFile(voiceId);
     if (!file) return null;
 
-    // Voice file exists but transcript is missing -> Run shared ingestion pipeline!
-    console.log(`[Voices] Missing transcript for voice '${voiceId}'. Running JIT ingestion pipeline...`);
+    // Voice file exists but transcript is missing -> Run shared ingestion pipeline into local voices/
+    console.log(`[Voices] Missing transcript for voice '${voiceId}'. Ingesting reference into local voices/ folder...`);
     return await this.ingestVoiceAudio(file, voiceId);
   }
 

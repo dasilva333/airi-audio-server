@@ -26,6 +26,15 @@ const MODEL_CATALOG = [
   },
   {
     num: "3",
+    id: "higgs-audio-tts",
+    name: "Higgs Audio v3 TTS Q8_0",
+    family: "higgs_audio",
+    vram: "~4.80 GB",
+    features: "46 Native Paralinguistic Tags (<|emotion:...|>), Zero-Shot Voice Cloning",
+    relPath: "models/Higgs-GGUF/higgs-audio-q8_0.gguf"
+  },
+  {
+    num: "4",
     id: "kokoro-tts",
     name: "Kokoro TTS Q8_0",
     family: "kokoro",
@@ -34,7 +43,7 @@ const MODEL_CATALOG = [
     relPath: "models/Kokoro-GGUF/kokoro-q8_0.gguf"
   },
   {
-    num: "4",
+    num: "5",
     id: "qwen-audio-tts",
     name: "Qwen3 Audio TTS Q8_0",
     family: "qwen_audio",
@@ -110,7 +119,7 @@ function runSetup() {
       console.log(`      Path: ${fullPath}\n`);
     });
 
-    rl.question("Enter your choice (1-4, default is 1): ", (answer) => {
+    rl.question("Enter your choice (1-5, default is 1): ", (answer) => {
       const choice = answer.trim() || "1";
       const selected = MODEL_CATALOG.find(m => m.num === choice) || MODEL_CATALOG[0];
 
@@ -123,7 +132,7 @@ function runSetup() {
       config.models[selected.id] = {
         family: selected.family,
         path: modelFullPath,
-        allow_unfiltered_tags: selected.family === 'fish_audio'
+        allow_unfiltered_tags: selected.family === 'fish_audio' || selected.family === 'higgs_audio'
       };
 
       fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2), 'utf-8');

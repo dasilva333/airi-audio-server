@@ -12,7 +12,11 @@
     "model_path": "../audio.cpp/models/whisper-small.bin"
   },
   "chatterbox_voices_dir": "../chatterbox/voices",
-  "installed_models": ["omnivoice-tts", "fish-audio-tts"],
+  "installed_models": [
+    "omnivoice-tts",
+    "fish-audio-tts",
+    "higgs-audio-tts"
+  ],
   "models": {
     "omnivoice-tts": {
       "family": "omnivoice",
@@ -22,6 +26,11 @@
     "fish-audio-tts": {
       "family": "fish_audio",
       "path": "../audio.cpp/models/Fish-Audio-S2-Pro-GGUF/fish-audio-s2-pro-q8_0.gguf",
+      "allow_unfiltered_tags": true
+    },
+    "higgs-audio-tts": {
+      "family": "higgs_audio",
+      "path": "../audio.cpp/models/Higgs-GGUF/higgs-audio-q8_0.gguf",
       "allow_unfiltered_tags": true
     }
   }

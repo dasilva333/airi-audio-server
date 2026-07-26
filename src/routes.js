@@ -115,9 +115,13 @@ function createRouter(engine, voiceManager, textProcessor, gpuQueue, config) {
     try {
       let { model, input, voice = 'morgan-freeman', response_format = 'ogg', allow_unfiltered_tags = false } = req.body;
 
-      // AIRI Health Check Fallback: If voice is 'alloy' or model is 'tts-1', fallback gracefully!
+      const requestedVoice = voice;
+      // AIRI Health Check & Voice Validation Fallback
       if (!voice || voice === 'alloy' || !voiceManager.getVoiceFile(voice)) {
         voice = 'morgan-freeman';
+        if (requestedVoice && requestedVoice !== 'alloy' && requestedVoice !== 'morgan-freeman') {
+          console.warn(`[Voices Warning] Requested voice '${requestedVoice}' not found on disk. Falling back to default voice '${voice}'.`);
+        }
       }
 
       // Check non-spoken text rule: return 204 No Content if input lacks pronounceable letters
@@ -133,7 +137,7 @@ function createRouter(engine, voiceManager, textProcessor, gpuQueue, config) {
       // Clean emojis & filter/preserve tags based on model family
       const cleanedInput = textProcessor.process(input, modelCfg.family, shouldBypass);
 
-      console.log(`[API] Speech Request: model='${modelId}', voice='${voice}', fmt='${response_format}'`);
+      console.log(`[API] Speech Request: model='${modelId}', voice='${voice}' (requested: '${requestedVoice}'), fmt='${response_format}'`);
       const tStart = Date.now();
 
       // Enqueue job in Unified Serialized GPU FIFO Queue
@@ -163,6 +167,7 @@ function createRouter(engine, voiceManager, textProcessor, gpuQueue, config) {
       console.log("=".repeat(60));
       console.log(`[API RTF Metric] Synthesis SUCCESS`);
       console.log(`  Model           : ${modelId}`);
+      console.log(`  Voice           : ${voice} (requested: ${requestedVoice})`);
       console.log(`  Latency         : ${latencySec}s (${latencyMs} ms)`);
       console.log(`  Audio Duration  : ${audioDuration.toFixed(2)}s`);
       console.log(`  Real-Time Factor: ${rtf} (${realtimeSpeed}x real-time speed)`);

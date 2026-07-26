@@ -44,8 +44,12 @@ class AudioCppEngine {
   }
 
   resolveModelId(modelId) {
-    if (!modelId || modelId === 'tts-1' || !this.config.models[modelId]) {
-      return this.getDefaultModelId();
+    if (!modelId || modelId === 'tts-1' || modelId === 'chatterbox' || !this.config.models[modelId]) {
+      const defaultId = this.getDefaultModelId();
+      if (modelId && modelId !== defaultId && modelId !== 'tts-1') {
+        console.warn(`[Engine Warning] Requested model '${modelId}' not registered in config.json. Mapping to primary model '${defaultId}'.`);
+      }
+      return defaultId;
     }
     return modelId;
   }

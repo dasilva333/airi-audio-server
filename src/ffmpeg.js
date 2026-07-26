@@ -2,9 +2,50 @@ const { spawn } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
-function convertWavToOgg(wavBuffer) {
+function resolvePath(relativePath) {
+  if (!relativePath) return '';
+  if (path.isAbsolute(relativePath)) return relativePath;
+  return path.resolve(__dirname, '..', relativePath);
+}
+
+function getFfmpegCmd(customPath) {
+  if (customPath) {
+    const resolved = resolvePath(customPath);
+    if (fs.existsSync(resolved)) return resolved;
+  }
+  const commonPaths = [
+    'C:\\ffmpeg\\bin\\ffmpeg.exe',
+    'C:\\Program Files\\ffmpeg\\bin\\ffmpeg.exe',
+    path.resolve(__dirname, '../ffmpeg.exe'),
+    path.resolve(__dirname, '../../audio.cpp/ffmpeg.exe')
+  ];
+  for (const p of commonPaths) {
+    if (fs.existsSync(p)) return p;
+  }
+  return 'ffmpeg';
+}
+
+function getFfprobeCmd(customPath) {
+  if (customPath) {
+    const resolved = resolvePath(customPath);
+    if (fs.existsSync(resolved)) return resolved;
+  }
+  const commonPaths = [
+    'C:\\ffmpeg\\bin\\ffprobe.exe',
+    'C:\\Program Files\\ffmpeg\\bin\\ffprobe.exe',
+    path.resolve(__dirname, '../ffprobe.exe'),
+    path.resolve(__dirname, '../../audio.cpp/ffprobe.exe')
+  ];
+  for (const p of commonPaths) {
+    if (fs.existsSync(p)) return p;
+  }
+  return 'ffprobe';
+}
+
+function convertWavToOgg(wavBuffer, ffmpegPath = null) {
   return new Promise((resolve, reject) => {
-    const ffmpeg = spawn('ffmpeg', [
+    const ffmpegBin = getFfmpegCmd(ffmpegPath);
+    const ffmpeg = spawn(ffmpegBin, [
       '-i', 'pipe:0',
       '-c:a', 'libopus',
       '-b:a', '48k',
@@ -34,7 +75,7 @@ function convertWavToOgg(wavBuffer) {
   });
 }
 
-function normalizeAudioToWav(inputPath, outputPath) {
+function normalizeAudioToWav(inputPath, outputPath, ffmpegPath = null) {
   return new Promise((resolve, reject) => {
     if (!fs.existsSync(inputPath)) {
       return reject(new Error(`Audio reference file not found: ${inputPath}`));
@@ -44,9 +85,10 @@ function normalizeAudioToWav(inputPath, outputPath) {
     const resolvedOutput = path.resolve(outputPath);
     const isSameFile = (resolvedInput === resolvedOutput);
     const actualOutput = isSameFile ? `${outputPath}.norm.wav` : outputPath;
+    const ffmpegBin = getFfmpegCmd(ffmpegPath);
 
     let stderr = '';
-    const ffmpeg = spawn('ffmpeg', [
+    const ffmpeg = spawn(ffmpegBin, [
       '-y',
       '-i', inputPath,
       '-ar', '24000',
@@ -80,19 +122,26 @@ function normalizeAudioToWav(inputPath, outputPath) {
     });
 
     ffmpeg.on('error', (err) => {
-      reject(new Error(`Failed to execute FFmpeg binary: ${err.message}`));
+      if (err.code === 'ENOENT') {
+        reject(new Error(`FFmpeg binary not found on your computer.\nTo fix this: Please install FFmpeg (e.g. run 'winget install ffmpeg' in PowerShell or add ffmpeg.exe to system PATH).`));
+      } else {
+        reject(new Error(`Failed to execute FFmpeg binary: ${err.message}`));
+      }
     });
   });
 }
 
-function ensureOptimalAudioLength(wavPath) {
+function ensureOptimalAudioLength(wavPath, ffmpegPath = null) {
   return new Promise((resolve, reject) => {
     if (!fs.existsSync(wavPath)) {
       return resolve(wavPath);
     }
 
+    const ffprobeBin = getFfprobeCmd(ffmpegPath);
+    const ffmpegBin = getFfmpegCmd(ffmpegPath);
+
     // Inspect duration using ffprobe
-    const ffprobe = spawn('ffprobe', [
+    const ffprobe = spawn(ffprobeBin, [
       '-v', 'error',
       '-show_entries', 'format=duration',
       '-of', 'default=noprint_wrappers=1:nokey=1',
@@ -107,7 +156,7 @@ function ensureOptimalAudioLength(wavPath) {
         console.log(`[FFmpeg] Reference clip ${path.basename(wavPath)} is too short (${duration}s). Self-concatenating...`);
         // Duplicate clip twice onto itself to reach ~3-4.5 seconds
         const tmpOutput = `${wavPath}.looped.wav`;
-        const concatProc = spawn('ffmpeg', [
+        const concatProc = spawn(ffmpegBin, [
           '-y',
           '-stream_loop', '2',
           '-i', wavPath,

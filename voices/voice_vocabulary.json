@@ -2,5 +2,9 @@
   "morgan-freeman": {
     "file": "../chatterbox/voices/morgan-freeman.wav",
     "transcript": "Hope is a good thing, maybe the best of things, and no good thing ever dies."
+  },
+  "trump-2": {
+    "file": "C:\\Users\\h4rdc\\Documents\\Github\\coding-agent\\airi-audio-server\\voices\\trump-2.wav",
+    "transcript": "Speaker reference sample."
   }
 }

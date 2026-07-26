@@ -6,12 +6,23 @@
 
 ---
 
-## 📦 Prerequisites & Requirements
+## ⚡ 1-Click Automated Setup
 
-`airi-audio-server` is the Node.js API layer that connects to the high-performance C++ `audio.cpp` inference engine. To run speech synthesis, you need the compiled `audiocpp_server.exe` C++ executable and model weight `.gguf` files.
+Double-click `install.bat` on Windows! The installer automatically:
+1. Installs Node.js dependencies (`npm install`).
+2. Clones the `audio.cpp` C++ engine repository if missing (`git clone`).
+3. Compiles the CUDA release binaries (`cmake -DGGML_CUDA=ON`).
+4. Launches the interactive model configuration wizard (`node setup.js`).
 
-### Option A: Standard Sibling Directory Layout (Default)
-Place `audio.cpp` in a sibling folder alongside `airi-audio-server`:
+```cmd
+install.bat
+```
+
+---
+
+## 📦 Directory Architecture
+
+By default, `install.bat` arranges `audio.cpp` in a sibling directory layout:
 ```text
 /your-parent-folder/
 ├── airi-audio-server/
@@ -20,22 +31,6 @@ Place `audio.cpp` in a sibling folder alongside `airi-audio-server`:
     └── models/
         └── OmniVoice-GGUF/omnivoice-q8_0.gguf
 ```
-
-### Option B: Custom Existing `audio.cpp` Installation
-If `audio.cpp` is located in another folder on your computer (e.g. `C:\Tools\audio.cpp`), simply update `config.json` or run `install.bat` / `node setup.js` — the wizard will prompt you to enter your custom folder path!
-
----
-
-## ⚡ Core Features
-
-1. **Zero Python Overhead**: Runs pure compiled C++ binaries (`audiocpp_server.exe` and `whisper_cli.exe`) bound to CUDA GPU.
-2. **Unified Serialized GPU Queue (`src/queue.js`)**: Single FIFO queue for all GPU tasks (TTS synthesis, STT transcriptions, voice registrations), preventing VRAM collisions and CUDA context corruption.
-3. **On-Demand GPU Whisper (`src/stt.js`)**: Runs `whisper.cpp` on CUDA GPU for Speech-to-Text reference transcription and unloads immediately, keeping 100% VRAM free for TTS synthesis.
-4. **Shared Ingestion & Short Audio Normalization (`src/voices.js` & `src/ffmpeg.js`)**:
-   - Converts uploaded audio clips to 24kHz mono PCM WAV via FFmpeg.
-   - Self-concatenates reference clips shorter than 1.5s to 3–5 seconds so zero-shot voice cloning never fails.
-5. **Real-Time Factor (RTF) Metrics & Headers**: Computes exact latency, audio duration, RTF, and real-time speed, returning them in custom HTTP headers (`X-Real-Time-Factor`, `X-Realtime-Speed`, `X-Synthesis-Latency-Ms`, `X-Audio-Duration-Sec`).
-6. **Dual Tag Bracket Parsing (`<|tag|>` and `[tag]`)**: Parses model-specific paralinguistic expression tags without leaking tags across model families.
 
 ---
 
@@ -83,24 +78,15 @@ All configuration parameters are fully exposed and customizable in `config.json`
 
 ---
 
-## 🚀 Quick Start
+## 🚀 Server Commands
 
-### 1. Installation & Interactive Setup
-Run the interactive setup installer:
-```cmd
-install.bat
-```
-*(or run `npm run setup`)*
-
-The installer will automatically verify your `audio.cpp` installation and prompt you for custom folder locations if needed.
-
-### 2. Start the Server
+### Start Server
 ```cmd
 npm start
 ```
-The server will start on `http://localhost:8095`.
+Starts `airi-audio-server` on `http://localhost:8095`.
 
-### 3. Run Verification Test
+### Run Verification Test
 ```cmd
 npm test
 ```

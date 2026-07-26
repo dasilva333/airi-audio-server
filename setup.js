@@ -25,7 +25,7 @@ const MODEL_CATALOG = [
     vram: "~6.31 GB",
     features: "Dual-AR Fast Streaming Synthesis, Zero-Shot Voice Cloning, 1.25 RTF",
     relPath: "models/Fish-Audio-S2-Pro-GGUF/fish-audio-s2-pro-q8_0.gguf",
-    downloadUrl: "https://huggingface.co/fishaudio/fish-speech-1.5/resolve/main/fish-audio-s2-pro-q8_0.gguf"
+    downloadUrl: "https://huggingface.co/rodrigomt/s2-pro-gguf/resolve/main/fish-audio-s2-pro-q8_0.gguf"
   },
   {
     num: "3",

@@ -18,14 +18,16 @@ class TextProcessor {
         for (let i = 1; i < lines.length; i++) {
           const parts = lines[i].split(',');
           if (parts.length >= 2) {
-            const tag = parts[1].trim().toLowerCase();
-            if (tag) {
-              this.validTags.add(`[${tag.replace(/_/g, ' ')}]`);
-              this.validTags.add(`[${tag}]`);
+            const rawTag = parts[1].trim().toLowerCase();
+            if (rawTag) {
+              this.validTags.add(rawTag);
+              this.validTags.add(`[${rawTag}]`);
+              this.validTags.add(`[${rawTag.replace(/_/g, ' ')}]`);
+              this.validTags.add(`<|${rawTag}|>`);
             }
           }
         }
-        console.log(`[TextProcessor] Loaded ${this.validTags.size} supported tags.`);
+        console.log(`[TextProcessor] Loaded ${this.validTags.size} supported tag variations.`);
       } catch (err) {
         console.error(`[TextProcessor] Error reading supported_tags.csv: ${err.message}`);
       }
@@ -48,7 +50,8 @@ class TextProcessor {
     if (allowUnfiltered) {
       return text;
     }
-    return text.replace(/\[[^\]]+\]/g, (match) => {
+    // Filter both [tag] and <|tag|> bracket formats
+    return text.replace(/(\[[^\]]+\]|<\|[^|]+\|>)/g, (match) => {
       const normalized = match.trim().toLowerCase();
       if (this.validTags.has(normalized)) {
         return match;

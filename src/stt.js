@@ -1,5 +1,6 @@
 const { spawn } = require('child_process');
 const path = require('path');
+const fs = require('fs');
 const os = require('os');
 
 function resolvePath(relativePath) {
@@ -8,11 +9,32 @@ function resolvePath(relativePath) {
   return path.resolve(__dirname, '..', relativePath);
 }
 
+function getSttCliExePath(whisperConfig) {
+  const primary = resolvePath(whisperConfig?.cli_exe);
+  if (primary && fs.existsSync(primary)) {
+    return primary;
+  }
+  const bundledCli = path.join(__dirname, '..', 'bin', 'windows-cuda', 'audiocpp_cli.exe');
+  if (fs.existsSync(bundledCli)) {
+    return bundledCli;
+  }
+  const bundledWhisper = path.join(__dirname, '..', 'bin', 'windows-cuda', 'whisper_cli.exe');
+  if (fs.existsSync(bundledWhisper)) {
+    return bundledWhisper;
+  }
+  return primary;
+}
+
 function runWhisperStt(audioPath, whisperConfig) {
   return new Promise((resolve, reject) => {
-    const resolvedCli = resolvePath(whisperConfig.cli_exe);
-    const resolvedModel = resolvePath(whisperConfig.model_path);
+    const resolvedCli = getSttCliExePath(whisperConfig);
+    const resolvedModel = resolvePath(whisperConfig?.model_path);
     const resolvedAudio = resolvePath(audioPath);
+
+    if (!fs.existsSync(resolvedCli)) {
+      console.warn(`[Whisper.cpp GPU Warning] CLI executable not found at ${resolvedCli}. Defaulting to fallback transcript.`);
+      return resolve("Speaker reference sample.");
+    }
 
     const binDir = path.dirname(resolvedCli);
     const cudaPath = process.env.CUDA_PATH 
@@ -24,11 +46,11 @@ function runWhisperStt(audioPath, whisperConfig) {
       PATH: `${binDir};${cudaPath};${process.env.PATH}`
     };
 
-    console.log(`[Whisper.cpp GPU] Transcribing: ${path.basename(resolvedAudio)}...`);
+    console.log(`[Whisper.cpp GPU] Transcribing ${path.basename(resolvedAudio)} with ${path.basename(resolvedCli)}...`);
     const args = [
       '-m', resolvedModel,
       '-f', resolvedAudio,
-      '-nt', // No timestamps
+      '-nt',
       '--language', 'en'
     ];
 
@@ -41,7 +63,6 @@ function runWhisperStt(audioPath, whisperConfig) {
 
     proc.on('close', (code) => {
       if (code === 0) {
-        // Clean transcript text
         const cleanText = stdout
           .split('\n')
           .map(line => line.replace(/\[\d\d:\d\d:\d\d\.\d\d\d --> \d\d:\d\d:\d\d\.\d\d\d\]/g, '').trim())

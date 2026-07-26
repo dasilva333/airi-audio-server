@@ -72,7 +72,7 @@ function downloadFile(url, targetPath) {
       fs.mkdirSync(dir, { recursive: true });
     }
 
-    console.log(`\n📥 Auto-Downloading model weights from HuggingFace...`);
+    console.log(`\n📥 Auto-Downloading weights...`);
     console.log(`URL   : ${url}`);
     console.log(`Target: ${targetPath}\n`);
 
@@ -103,7 +103,7 @@ function downloadFile(url, targetPath) {
 
         response.on('end', () => {
           fileStream.end();
-          console.log(`\n\n✅ Model weights downloaded successfully!`);
+          console.log(`\n\n✅ Download completed successfully!`);
           resolve(targetPath);
         });
 
@@ -134,6 +134,19 @@ function ensureModelSidecars(modelPath, family) {
     };
     fs.writeFileSync(configFile, JSON.stringify(sidecarConfig, null, 2), 'utf-8');
     console.log(`[Setup] Auto-created missing sidecar config at: ${configFile}`);
+  }
+}
+
+async function ensureWhisperModel(audioCppDir) {
+  const whisperModelPath = resolvePath(path.join(audioCppDir, 'models/whisper-small.bin'));
+  if (!fs.existsSync(whisperModelPath)) {
+    const whisperUrl = 'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin';
+    console.log(`\n🎙️  Whisper STT Model Not Found. Auto-Downloading for GPU Voice Transcription...`);
+    try {
+      await downloadFile(whisperUrl, whisperModelPath);
+    } catch (err) {
+      console.warn(`[Whisper Setup Warning] Could not auto-download Whisper model: ${err.message}`);
+    }
   }
 }
 
@@ -187,7 +200,10 @@ function runSetup() {
     }
   };
 
-  checkAndPromptAudioCpp(() => {
+  checkAndPromptAudioCpp(async () => {
+    // Auto-ensure Whisper model exists for GPU STT
+    await ensureWhisperModel(audioCppDir);
+
     console.log("\nSelect the primary TTS model to enable for AIRI Audio Server:\n");
     MODEL_CATALOG.forEach(m => {
       const fullPath = path.join(audioCppDir, m.relPath);

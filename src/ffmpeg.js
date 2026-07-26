@@ -40,6 +40,11 @@ function normalizeAudioToWav(inputPath, outputPath) {
       return reject(new Error(`Audio reference file not found: ${inputPath}`));
     }
 
+    const resolvedInput = path.resolve(inputPath);
+    const resolvedOutput = path.resolve(outputPath);
+    const isSameFile = (resolvedInput === resolvedOutput);
+    const actualOutput = isSameFile ? `${outputPath}.norm.wav` : outputPath;
+
     let stderr = '';
     const ffmpeg = spawn('ffmpeg', [
       '-y',
@@ -47,15 +52,27 @@ function normalizeAudioToWav(inputPath, outputPath) {
       '-ar', '24000',
       '-ac', '1',
       '-c:a', 'pcm_s16le',
-      outputPath
+      actualOutput
     ]);
 
     ffmpeg.stderr.on('data', d => stderr += d.toString());
 
     ffmpeg.on('close', (code) => {
       if (code !== 0) {
+        if (isSameFile && fs.existsSync(actualOutput)) {
+          try { fs.unlinkSync(actualOutput); } catch (e) {}
+        }
         return reject(new Error(`FFmpeg conversion failed for '${path.basename(inputPath)}'.\nFFmpeg Log: ${stderr.trim() || 'Exit code ' + code}`));
       }
+
+      if (isSameFile) {
+        try {
+          fs.renameSync(actualOutput, outputPath);
+        } catch (e) {
+          return reject(new Error(`Failed to update normalized WAV file: ${e.message}`));
+        }
+      }
+
       if (!fs.existsSync(outputPath) || fs.statSync(outputPath).size === 0) {
         return reject(new Error(`FFmpeg output file '${outputPath}' is missing or empty.`));
       }

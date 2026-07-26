@@ -19,16 +19,6 @@ const MODEL_CATALOG = [
   },
   {
     num: "2",
-    id: "fish-audio-tts",
-    name: "Fish Audio S2 Pro Q8_0",
-    family: "fish_audio",
-    vram: "~6.31 GB",
-    features: "Dual-AR Fast Streaming Synthesis, Zero-Shot Voice Cloning, 1.25 RTF",
-    relPath: "models/Fish-Audio-S2-Pro-GGUF/fish-audio-s2-pro-q8_0.gguf",
-    downloadUrl: "https://huggingface.co/audio-cpp/audio.cpp-gguf/resolve/main/Fish-Audio-S2-Pro-GGUF/fish-audio-s2-pro-q8_0.gguf"
-  },
-  {
-    num: "3",
     id: "higgs-audio-tts",
     name: "Higgs Audio v3 TTS Q8_0",
     family: "higgs_audio_tts",
@@ -38,24 +28,34 @@ const MODEL_CATALOG = [
     downloadUrl: "https://huggingface.co/audio-cpp/audio.cpp-gguf/resolve/main/Higgs-Audio-v3-TTS-4B-GGUF/higgs-audio-v3-tts-4b-q8_0.gguf"
   },
   {
+    num: "3",
+    id: "fish-audio-tts",
+    name: "Fish Audio S2 Pro Q8_0",
+    family: "fish_audio",
+    vram: "~6.31 GB",
+    features: "Dual-AR Fast Streaming Synthesis, Zero-Shot Voice Cloning, 1.25 RTF",
+    relPath: "models/Fish-Audio-S2-Pro-GGUF/fish-audio-s2-pro-q8_0.gguf",
+    downloadUrl: "https://huggingface.co/audio-cpp/audio.cpp-gguf/resolve/main/Fish-Audio-S2-Pro-GGUF/fish-audio-s2-pro-q8_0.gguf"
+  },
+  {
     num: "4",
-    id: "kokoro-tts",
-    name: "Kokoro TTS Q8_0",
-    family: "kokoro",
-    vram: "~0.85 GB",
-    features: "Ultra-Lightweight Speech Model",
-    relPath: "models/Kokoro-GGUF/kokoro-q8_0.gguf",
-    downloadUrl: null
+    id: "chatterbox-tts",
+    name: "Chatterbox TTS Q8_0",
+    family: "chatterbox",
+    vram: "~2.10 GB",
+    features: "High-Fidelity Expressive Speech Synthesis",
+    relPath: "models/Chatterbox-GGUF/chatterbox-q8_0.gguf",
+    downloadUrl: "https://huggingface.co/audio-cpp/audio.cpp-gguf/resolve/main/Chatterbox-GGUF/chatterbox-q8_0.gguf"
   },
   {
     num: "5",
-    id: "qwen-audio-tts",
-    name: "Qwen3 Audio TTS Q8_0",
-    family: "qwen_audio",
-    vram: "~3.50 GB",
-    features: "Multilingual Voice Synthesis",
-    relPath: "models/Qwen-GGUF/qwen-q8_0.gguf",
-    downloadUrl: null
+    id: "moss-tts",
+    name: "MOSS TTS Local v1.5 Q8_0",
+    family: "moss_tts",
+    vram: "~7.50 GB",
+    features: "Large Scale Multilingual Neural Speech Model",
+    relPath: "models/MOSS-TTS-GGUF/moss-tts-local-v1.5-q8_0.gguf",
+    downloadUrl: "https://huggingface.co/audio-cpp/audio.cpp-gguf/resolve/main/MOSS-TTS-Local-v1.5-GGUF/moss-tts-local-v1.5-q8_0.gguf"
   }
 ];
 

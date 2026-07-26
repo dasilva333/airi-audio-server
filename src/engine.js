@@ -93,16 +93,16 @@ class AudioCppEngine {
     fs.writeFileSync(tempConfigPath, JSON.stringify(serverConfig, null, 2), 'utf-8');
 
     console.log(`[Engine] Spawning audiocpp_server.exe (${modelId})...`);
-    console.log(`[Engine] Executable: ${resolvedServerExe}`);
-    console.log(`[Engine] Config: ${tempConfigPath}`);
 
+    // Ensure bin folder and CUDA DLL path are included in PATH to avoid STATUS_DLL_NOT_FOUND (0xC0000135)
+    const binDir = path.dirname(resolvedServerExe);
     const cudaPath = process.env.CUDA_PATH 
       ? path.join(process.env.CUDA_PATH, 'bin')
       : "C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v13.1\\bin\\x64";
       
     const env = {
       ...process.env,
-      PATH: `${cudaPath};${process.env.PATH}`
+      PATH: `${binDir};${cudaPath};${process.env.PATH}`
     };
 
     this.process = spawn(resolvedServerExe, ['--config', tempConfigPath], {

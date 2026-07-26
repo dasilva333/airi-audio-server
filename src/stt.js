@@ -14,13 +14,14 @@ function runWhisperStt(audioPath, whisperConfig) {
     const resolvedModel = resolvePath(whisperConfig.model_path);
     const resolvedAudio = resolvePath(audioPath);
 
+    const binDir = path.dirname(resolvedCli);
     const cudaPath = process.env.CUDA_PATH 
       ? path.join(process.env.CUDA_PATH, 'bin')
       : "C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v13.1\\bin\\x64";
 
     const env = {
       ...process.env,
-      PATH: `${cudaPath};${process.env.PATH}`
+      PATH: `${binDir};${cudaPath};${process.env.PATH}`
     };
 
     console.log(`[Whisper.cpp GPU] Transcribing: ${path.basename(resolvedAudio)}...`);

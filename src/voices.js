@@ -48,6 +48,25 @@ class VoiceManager {
     fs.writeFileSync(this.vocabularyPath, JSON.stringify(this.vocabulary, null, 2), 'utf-8');
   }
 
+  safeArchiveFile(filePath) {
+    if (fs.existsSync(filePath)) {
+      try {
+        const archiveDir = path.join(this.voicesDir, 'archive');
+        if (!fs.existsSync(archiveDir)) {
+          fs.mkdirSync(archiveDir, { recursive: true });
+        }
+        const timestamp = Date.now();
+        const ext = path.extname(filePath);
+        const base = path.basename(filePath, ext);
+        const backupPath = path.join(archiveDir, `${base}_${timestamp}${ext}.bak`);
+        fs.renameSync(filePath, backupPath);
+        console.log(`[Voices Safety] Safely archived previous file: ${path.basename(filePath)} -> archive/${path.basename(backupPath)}`);
+      } catch (e) {
+        console.error(`[Voices Safety Warning] Could not archive file: ${e.message}`);
+      }
+    }
+  }
+
   getVoiceFile(voiceId) {
     if (!voiceId) return null;
     const extensions = ['.wav', '.mp3', '.ogg', '.m4a', '.flac'];
@@ -76,12 +95,12 @@ class VoiceManager {
 
     let targetWavPath = path.join(this.voicesDir, `${voiceId}.wav`);
 
-    // Strictly ensure we NEVER delete files from chatterboxDir or external folders!
+    // ZERO FILE DELETION RULE: Safely archive existing local file if replacing inside local voicesDir
     const existingFile = this.getVoiceFile(voiceId);
     const resolvedVoicesDir = path.resolve(this.voicesDir);
     if (existingFile && existingFile !== targetWavPath && path.resolve(existingFile).startsWith(resolvedVoicesDir)) {
-      console.log(`[Voices] Updating local voice '${voiceId}' (replacing ${path.basename(existingFile)})...`);
-      try { fs.unlinkSync(existingFile); } catch (e) {}
+      console.log(`[Voices Safety] Archiving previous local voice file '${path.basename(existingFile)}'...`);
+      this.safeArchiveFile(existingFile);
     }
 
     // Step 1: Normalize audio format to 24kHz mono PCM WAV via FFmpeg into local voicesDir

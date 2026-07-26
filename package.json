@@ -1,14 +1,24 @@
 {
   "name": "airi-audio-server",
   "version": "1.0.0",
-  "description": "Zero-Python C++/Node.js audio microservice for AIRI featuring unified GPU queueing, JIT Whisper voice auto-transcription, and OpenAI endpoints.",
+  "description": "Zero-Python Node.js & C++ Audio Microservice for AIRI with OpenAI API, Voice Discovery, and CUDA Queueing",
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
-    "dev": "node --watch src/server.js",
     "setup": "node setup.js",
+    "add-model": "node setup.js",
     "test": "node test.js"
   },
+  "keywords": [
+    "airi",
+    "tts",
+    "audio-cpp",
+    "whisper-cpp",
+    "cuda",
+    "openai-api"
+  ],
+  "author": "AIRI",
+  "license": "MIT",
   "dependencies": {
     "cors": "^2.8.5",
     "express": "^4.19.2",

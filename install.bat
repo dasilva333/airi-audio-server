@@ -16,11 +16,11 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 
-:: 2. Check & Clone audio.cpp repository
+:: 2. Check & Clone official public audio.cpp repository
 if not exist "..\audio.cpp" (
     echo.
-    echo [2/4] Cloning audio.cpp C++ engine repository...
-    git clone https://github.com/dasilva333/audio.cpp ..\audio.cpp
+    echo [2/4] Cloning official audio.cpp C++ engine repository...
+    git clone https://github.com/0xShug0/audio.cpp ..\audio.cpp
     if %errorlevel% neq 0 (
         echo [WARNING] Failed to clone audio.cpp automatically. Proceeding to setup...
     )

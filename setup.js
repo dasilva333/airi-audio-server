@@ -131,10 +131,10 @@ function runSetup() {
 
       if (!fs.existsSync(resolvePath(resolvedServerExe))) {
         console.log("!".repeat(60));
-        console.log("📋 SETUP INSTRUCTION FOR external users:");
+        console.log("📋 SETUP INSTRUCTION FOR EXTERNAL USERS:");
         console.log("To run airi-audio-server, you need the compiled C++ audio.cpp binary.");
-        console.log("1. Clone audio.cpp repo: git clone https://github.com/dasilva333/audio.cpp");
-        console.log("2. Build with CMake: cmake -B build -DGGML_CUDA=ON && cmake --build build --config Release");
+        console.log("1. Clone audio.cpp repo: git clone https://github.com/0xShug0/audio.cpp");
+        console.log("2. Build with CMake: cmake -B build/windows-cuda-release -DGGML_CUDA=ON && cmake --build build/windows-cuda-release --config Release");
         console.log("3. Or update 'audio_cpp.server_exe' in config.json to point to your existing build.");
         console.log("!".repeat(60) + "\n");
       }

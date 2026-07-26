@@ -1,79 +1,115 @@
-# AIRI Audio Server (`airi-audio-server`)
+# AIRI Audio Server 🎙️🚀
 
-A zero-Python, high-performance C++/Node.js audio microservice providing OpenAI-compatible Text-to-Speech (TTS), Speech-to-Text (STT), and custom voice management endpoints engineered specifically for AIRI.
+> **High-Performance, Zero-Python Node.js & C++ Audio Microservice for AIRI**
+
+`airi-audio-server` is a lightweight, zero-Python Node.js microservice designed to serve C++ audio inference (`audio.cpp` and `whisper.cpp`) with full **OpenAI API compatibility**, **Voice Discovery**, **Paralinguistic Expression Tag Filtering**, and **Unified GPU Task Queueing**.
 
 ---
 
-## 🌟 Key Features
+## ⚡ Core Features & Architectural Superiority
 
-* **Zero-Python Dependency**: Built 100% on Node.js + C++ inference binaries (`audio.cpp` and `whisper.cpp`). A single `npm install` and `npm start` setup for end users.
-* **Unified Serialized GPU Queue**: All GPU TTS synthesis and STT Whisper jobs pass through a unified FIFO queue, ensuring zero GPU execution collisions or thread contention.
-* **On-Demand GPU Whisper (`whisper.cpp`)**: Runs `whisper.cpp` on CUDA GPU for ultra-fast STT, unloading weights from VRAM immediately after completion to keep 100% of VRAM free for TTS synthesis.
-* **Just-In-Time Voice Auto-Transcription**: Dropping voice clips into `voices/` or calling `POST /v1/voices` automatically converts audio to 24kHz mono PCM WAV via FFmpeg and runs GPU Whisper to generate sidecar transcripts.
-* **Short Audio Self-Concatenation**: If reference audio is too short (< 1.5s), the server automatically self-concatenates the clip to 3–5 seconds so zero-shot voice cloning succeeds cleanly.
-* **Paralinguistic Tag Bridge & Bypass Guard**: Bridges `supported_tags.csv` to `/v1/capabilities` and supports `"allow_unfiltered_tags": true` for models with massive tag vocabularies (e.g. Fish Audio S2, Higgs Audio with 15K+ tags).
-* **AIRI Health Check Compatibility**: Probes requesting `model: "tts-1"` or `voice: "alloy"` automatically fall back to the primary installed model (`omnivoice-tts`) and default voice (`morgan-freeman`), returning HTTP 200 audio bytes.
-* **Opus OGG Default Return Format**: Audio synthesis defaults to Opus OGG (`audio/ogg`) for seamless playback across Telegram, Discord, and AIRI clients.
-* **-65.5% VRAM Reduction**: Requires only **1.12 GB VRAM** for `omnivoice-q8_0.gguf` (vs. 3.25 GB in PyTorch).
+1. **Zero Python Overhead**: Runs pure compiled C++ binaries (`audiocpp_server.exe` and `whisper_cli.exe`) bound to CUDA GPU.
+2. **Unified Serialized GPU Queue (`src/queue.js`)**: Single FIFO queue for all GPU tasks (TTS synthesis, STT transcriptions, voice registrations), preventing VRAM collisions and CUDA context corruption.
+3. **On-Demand GPU Whisper (`src/stt.js`)**: Runs `whisper.cpp` on CUDA GPU for Speech-to-Text reference transcription and unloads immediately, keeping 100% VRAM free for TTS synthesis.
+4. **Shared Ingestion & Short Audio Normalization (`src/voices.js` & `src/ffmpeg.js`)**:
+   - Converts uploaded audio clips to 24kHz mono PCM WAV via FFmpeg.
+   - Self-concatenates reference clips shorter than 1.5s to 3–5 seconds so zero-shot voice cloning never fails.
+5. **Real-Time Factor (RTF) Metrics & Headers**: Computes exact latency, audio duration, RTF, and real-time speed, returning them in custom HTTP headers (`X-Real-Time-Factor`, `X-Realtime-Speed`, `X-Synthesis-Latency-Ms`, `X-Audio-Duration-Sec`).
+6. **Dual Tag Bracket Parsing (`<|tag|>` and `[tag]`)**: Parses model-specific paralinguistic expression tags without leaking tags across model families.
+
+---
+
+## 🛠️ Configuration Guide (`config.json`)
+
+All configuration parameters are fully exposed and customizable in `config.json`. No paths or CUDA settings are hidden in code:
+
+```json
+{
+  "port": 8095,
+  "host": "0.0.0.0",
+  "cuda_path": "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v13.1/bin/x64",
+  "audio_cpp": {
+    "server_exe": "../audio.cpp/build/windows-cuda-release/bin/audiocpp_server.exe",
+    "working_dir": "../audio.cpp",
+    "internal_port": 8080
+  },
+  "whisper_cpp": {
+    "cli_exe": "../audio.cpp/build/windows-cuda-release/bin/whisper_cli.exe",
+    "model_path": "../audio.cpp/models/whisper-small.bin"
+  },
+  "chatterbox_voices_dir": "../chatterbox/voices",
+  "installed_models": ["omnivoice-tts", "fish-audio-tts"],
+  "models": {
+    "omnivoice-tts": {
+      "family": "omnivoice",
+      "path": "../audio.cpp/models/OmniVoice-GGUF/omnivoice-q8_0.gguf",
+      "allow_unfiltered_tags": false
+    },
+    "fish-audio-tts": {
+      "family": "fish_audio",
+      "path": "../audio.cpp/models/Fish-Audio-S2-Pro-GGUF/fish-audio-s2-pro-q8_0.gguf",
+      "allow_unfiltered_tags": true
+    }
+  }
+}
+```
+
+### Key Parameters:
+- `cuda_path`: Path to CUDA Toolkit `bin/x64` binaries on Windows.
+- `audio_cpp.server_exe`: Path to `audiocpp_server.exe`.
+- `whisper_cpp.cli_exe`: Path to `whisper_cli.exe`.
+- `chatterbox_voices_dir`: Directory containing fallback reference voice WAV files.
+- `allow_unfiltered_tags`: Set `true` to allow raw model-specific tags (e.g., Fish Audio 15K tags or Higgs `<|tag|>`) to pass straight through.
 
 ---
 
 ## 🚀 Quick Start
 
-### One-Click Setup
-Double-click **`install.bat`** (or run `npm run setup`) to launch the interactive model setup wizard.
+### 1. Installation & Interactive Setup
+Run the interactive setup installer:
+```cmd
+install.bat
+```
+*(or run `npm run setup`)*
 
-### Direct Server Start
-```bash
+### 2. Start the Server
+```cmd
 npm start
 ```
+The server will start on `http://localhost:8095`.
+
+### 3. Run Verification Test
+```cmd
+npm test
+```
+*(or run `node test.js`)*
 
 ---
 
-## 📡 API Endpoints Specification
+## 📡 API Endpoints
 
-### 1. OpenAI Speech Synthesis (`POST /v1/audio/speech` & `POST /audio/speech`)
-```bash
-curl -X POST http://localhost:8095/v1/audio/speech \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "omnivoice-tts",
-    "voice": "morgan-freeman",
-    "input": "Well, [confirmation-en] I suppose that is true, [sigh] but who would have thought? [question-en]",
-    "response_format": "ogg"
-  }' \
-  --output speech.ogg
-```
+| Endpoint | Method | Description |
+| :--- | :--- | :--- |
+| `/health` | GET | Server health check probe. |
+| `/v1/models` | GET | List installed TTS models (OpenAI compatible). |
+| `/v1/voices` | GET | Discovered voice presets & custom cloned voices. |
+| `/v1/capabilities` | GET | Supported paralinguistic expression tags manifest. |
+| `/v1/audio/speech` | POST | Synthesize speech to Opus OGG / WAV audio. |
+| `/v1/audio/transcriptions` | POST | Transcribe audio files via GPU Whisper.cpp. |
 
-### 2. Custom Voice Registration Endpoint (`POST /v1/voices`)
-```bash
-curl -X POST http://localhost:8095/v1/voices \
-  -F "file=@/path/to/speaker_audio.mp3" \
-  -F "voice_id=custom-speaker"
-```
+---
 
-### 3. Speech-to-Text Endpoint (`POST /v1/audio/transcriptions`)
-```bash
-curl -X POST http://localhost:8095/v1/audio/transcriptions \
-  -F "file=@/path/to/speech_sample.wav"
-```
+## 🏷️ Supported Model Tag Mapping (`supported_tags.csv`)
 
-### 4. Voice Discovery (`GET /v1/voices`, `GET /v1/audio/voices`, `GET /voices`)
-```bash
-curl http://localhost:8095/v1/voices
-```
-
-### 5. Capabilities Manifest (`GET /v1/capabilities`)
-```bash
-curl http://localhost:8095/v1/capabilities
-```
-
-### 6. OpenAI Model List (`GET /v1/models`)
-```bash
-curl http://localhost:8095/v1/models
-```
+| Model Family | Code Name (`type`) | Description |
+| :--- | :--- | :--- |
+| **OmniVoice** | `omni` / `omnivoice` | Native laughter, sighs, English confirmation/question tags. |
+| **Chatterbox Full** | `chatterbox` | Spoken laughter, coughs, sighs, gasps. |
+| **Chatterbox Turbo**| `chatterbox_turbo` | Spoken laughter, coughs, sighs, gasps. |
+| **Higgs Audio** | `higgs_audio` | 46 Emotion, SFX, Style, Prosody & Noise tags (`<|tag|>`). |
+| **Fish Audio S2 Pro**| `fish_audio` | Full 15K tag bypass enabled (`allow_unfiltered_tags: true`). |
 
 ---
 
 ## 📄 License
-MIT License
+MIT License. Developed for AIRI.

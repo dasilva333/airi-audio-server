@@ -85,8 +85,8 @@ function createRouter(engine, voiceManager, textProcessor, gpuQueue, config) {
         transcript: result.transcript
       });
     } catch (err) {
-      console.error(`[Voice Register Error] ${err.message}`);
-      res.status(500).json({ error: { message: err.message } });
+      console.error(`[Voice Register Error] ${err.stack || err.message}`);
+      res.status(500).json({ error: { message: err.message, stack: err.stack } });
     }
   };
   router.post('/v1/voices', upload.single('file'), handleRegisterVoice);
@@ -105,8 +105,8 @@ function createRouter(engine, voiceManager, textProcessor, gpuQueue, config) {
 
       res.json({ text: transcript });
     } catch (err) {
-      console.error(`[STT Error] ${err.message}`);
-      res.status(500).json({ error: { message: err.message } });
+      console.error(`[STT Error] ${err.stack || err.message}`);
+      res.status(500).json({ error: { message: err.message, stack: err.stack } });
     }
   });
 
@@ -178,8 +178,13 @@ function createRouter(engine, voiceManager, textProcessor, gpuQueue, config) {
       return res.status(200).send(finalBuffer);
 
     } catch (err) {
-      console.error(`[Speech API Error] ${err.message}`);
-      res.status(500).json({ error: { message: err.message } });
+      console.error(`[Speech API Error] Detailed Failure:\n${err.stack || err.message}`);
+      return res.status(500).json({ 
+        error: { 
+          message: err.message,
+          details: "Check server console output for captured audio.cpp engine logs."
+        } 
+      });
     }
   };
 

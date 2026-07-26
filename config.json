@@ -1,6 +1,7 @@
 {
   "port": 8095,
   "host": "0.0.0.0",
+  "cuda_path": "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v13.1/bin/x64",
   "audio_cpp": {
     "server_exe": "../audio.cpp/build/windows-cuda-release/bin/audiocpp_server.exe",
     "working_dir": "../audio.cpp",

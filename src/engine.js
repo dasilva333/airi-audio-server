@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const { spawn } = require('child_process');
+const { spawn, execSync } = require('child_process');
 const http = require('http');
 
 class AudioCppEngine {
@@ -10,12 +10,30 @@ class AudioCppEngine {
     this.isReady = false;
     this.activeModel = null;
     this.activeVoice = null;
+    this.lastLogs = [];
+  }
+
+  logMessage(msg) {
+    this.lastLogs.push(msg);
+    if (this.lastLogs.length > 100) {
+      this.lastLogs.shift();
+    }
   }
 
   resolvePath(relativePath) {
     if (!relativePath) return '';
     if (path.isAbsolute(relativePath)) return relativePath;
     return path.resolve(__dirname, '..', relativePath);
+  }
+
+  getCudaPath() {
+    if (this.config.cuda_path) {
+      return this.resolvePath(this.config.cuda_path);
+    }
+    if (process.env.CUDA_PATH) {
+      return path.join(process.env.CUDA_PATH, 'bin');
+    }
+    return "C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v13.1\\bin\\x64";
   }
 
   getDefaultModelId() {
@@ -44,6 +62,15 @@ class AudioCppEngine {
     const resolvedServerExe = this.resolvePath(this.config.audio_cpp.server_exe);
     const resolvedModelPath = this.resolvePath(modelConfig.path);
     const resolvedVoiceRef = voiceRef ? this.resolvePath(voiceRef) : null;
+    const cudaBinPath = this.getCudaPath();
+
+    if (!fs.existsSync(resolvedServerExe)) {
+      throw new Error(`audiocpp_server executable not found at: ${resolvedServerExe}`);
+    }
+
+    if (!fs.existsSync(resolvedModelPath)) {
+      throw new Error(`Model weights not found at: ${resolvedModelPath}`);
+    }
 
     // Ensure working directory exists
     if (!fs.existsSync(resolvedWorkingDir)) {
@@ -60,6 +87,7 @@ class AudioCppEngine {
       return modelId;
     }
 
+    this.lastLogs = [];
     const tempConfigPath = path.join(resolvedWorkingDir, 'server.json');
     const serverConfig = {
       host: '127.0.0.1',
@@ -93,38 +121,49 @@ class AudioCppEngine {
     fs.writeFileSync(tempConfigPath, JSON.stringify(serverConfig, null, 2), 'utf-8');
 
     console.log(`[Engine] Spawning audiocpp_server.exe (${modelId})...`);
+    console.log(`[Engine] Executable : ${resolvedServerExe}`);
+    console.log(`[Engine] Config     : ${tempConfigPath}`);
+    console.log(`[Engine] CUDA Path  : ${cudaBinPath}`);
 
-    // Ensure bin folder and CUDA DLL path are included in PATH to avoid STATUS_DLL_NOT_FOUND (0xC0000135)
     const binDir = path.dirname(resolvedServerExe);
-    const cudaPath = process.env.CUDA_PATH 
-      ? path.join(process.env.CUDA_PATH, 'bin')
-      : "C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v13.1\\bin\\x64";
-      
-    const env = {
-      ...process.env,
-      PATH: `${binDir};${cudaPath};${process.env.PATH}`
-    };
 
-    this.process = spawn(resolvedServerExe, ['--config', tempConfigPath], {
-      cwd: resolvedWorkingDir,
-      env
-    });
+    if (process.platform === 'win32') {
+      const runnerBat = path.join(__dirname, '../run_server.bat');
+      this.process = spawn(`"${runnerBat}"`, [`"${resolvedServerExe}"`, `"${tempConfigPath}"`, `"${cudaBinPath}"`], {
+        cwd: resolvedWorkingDir,
+        shell: true
+      });
+    } else {
+      this.process = spawn(resolvedServerExe, ['--config', tempConfigPath], {
+        cwd: resolvedWorkingDir,
+        env: {
+          ...process.env,
+          PATH: `${binDir}:${cudaBinPath}:${process.env.PATH}`
+        }
+      });
+    }
 
     this.activeModel = modelId;
     this.activeVoice = resolvedVoiceRef;
 
     this.process.stdout.on('data', (data) => {
       const line = data.toString().trim();
-      if (line && !line.includes('CUDA graph warmup')) {
-        console.log(`[audio.cpp] ${line}`);
+      if (line) {
+        this.logMessage(`[stdout] ${line}`);
+        if (!line.includes('CUDA graph warmup')) {
+          console.log(`[audio.cpp] ${line}`);
+        }
       }
     });
 
     this.process.stderr.on('data', (data) => {
       const line = data.toString().trim();
-      // Suppress noisy CUDA graph warmup lines
-      if (line && !line.includes('CUDA graph warmup')) {
-        console.error(`[audio.cpp err] ${line}`);
+      if (line) {
+        this.logMessage(`[stderr] ${line}`);
+        // Suppress noisy CUDA graph warmup lines from console
+        if (!line.includes('CUDA graph warmup')) {
+          console.error(`[audio.cpp err] ${line}`);
+        }
       }
     });
 
@@ -145,7 +184,8 @@ class AudioCppEngine {
     const startTime = Date.now();
     while (Date.now() - startTime < timeoutMs) {
       if (!this.process) {
-        throw new Error("Server process exited unexpectedly.");
+        const lastErrOutput = this.lastLogs.slice(-20).join('\n');
+        throw new Error(`audiocpp_server process exited unexpectedly during initialization.\n--- Captured Engine Logs ---\n${lastErrOutput || 'No stdout/stderr logged.'}`);
       }
       try {
         const ok = await new Promise((resolve) => {
@@ -164,12 +204,12 @@ class AudioCppEngine {
       }
       await new Promise(r => setTimeout(r, 500));
     }
-    throw new Error("audiocpp_server health check timed out.");
+    const lastErrOutput = this.lastLogs.slice(-20).join('\n');
+    throw new Error(`audiocpp_server health check timed out after 90s.\n--- Captured Engine Logs ---\n${lastErrOutput || 'No stdout/stderr logged.'}`);
   }
 
   async synthesize(promptInput, modelIdInput = null, voiceRef = null, referenceText = '') {
     const resolvedModelId = await this.initialize(modelIdInput, voiceRef, referenceText);
-
     const resolvedVoiceRef = voiceRef ? this.resolvePath(voiceRef) : null;
 
     const payload = JSON.stringify({
@@ -193,15 +233,21 @@ class AudioCppEngine {
           if (res.statusCode === 200) {
             resolve(Buffer.concat(chunks));
           } else {
-            reject(new Error(`Synthesis request failed with status ${res.statusCode}`));
+            const lastErrOutput = this.lastLogs.slice(-20).join('\n');
+            reject(new Error(`Synthesis request failed with HTTP ${res.statusCode}.\n--- Captured Engine Logs ---\n${lastErrOutput}`));
           }
         });
       });
 
-      req.on('error', reject);
+      req.on('error', (err) => {
+        const lastErrOutput = this.lastLogs.slice(-20).join('\n');
+        reject(new Error(`Synthesis network error: ${err.message}\n--- Captured Engine Logs ---\n${lastErrOutput}`));
+      });
+
       req.on('timeout', () => {
         req.destroy();
-        reject(new Error("Synthesis request timed out."));
+        const lastErrOutput = this.lastLogs.slice(-20).join('\n');
+        reject(new Error(`Synthesis request timed out after 120s.\n--- Captured Engine Logs ---\n${lastErrOutput}`));
       });
 
       req.write(payload);
@@ -211,7 +257,13 @@ class AudioCppEngine {
 
   stop() {
     if (this.process) {
-      this.process.kill();
+      try {
+        if (process.platform === 'win32') {
+          execSync(`taskkill /pid ${this.process.pid} /T /F`);
+        } else {
+          this.process.kill();
+        }
+      } catch (e) {}
       this.process = null;
       this.isReady = false;
     }

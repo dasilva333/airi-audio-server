@@ -10,7 +10,14 @@ if not "%CUSTOM_CUDA_PATH%"=="" (
 ) else if not "%CUDA_PATH%"=="" (
     set "CUDA_BIN=%CUDA_PATH%\bin"
 ) else (
-    set "CUDA_BIN=C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.1\bin\x64"
+    rem Auto-detect latest installed CUDA version
+    set "CUDA_BIN="
+    for /d %%V in ("C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v*") do (
+        set "CUDA_BIN=%%V\bin"
+    )
+    if "%CUDA_BIN%"=="" (
+        echo [run_server.bat] WARNING: CUDA_PATH not set and no CUDA installation detected.
+    )
 )
 
 set "PATH=%BINDIR%;%CUDA_BIN%;%PATH%"

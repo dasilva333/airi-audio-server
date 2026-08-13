@@ -19,7 +19,7 @@ const tagsCsvPath = path.join(__dirname, '../supported_tags.csv');
 
 const gpuQueue = new UnifiedGpuQueue();
 const textProcessor = new TextProcessor(tagsCsvPath);
-const voiceManager = new VoiceManager(voicesDir, vocabularyPath, config.whisper_cpp);
+const voiceManager = new VoiceManager(voicesDir, vocabularyPath, config.asr);
 const engine = new AudioCppEngine(config);
 
 const router = createRouter(engine, voiceManager, textProcessor, gpuQueue, config);

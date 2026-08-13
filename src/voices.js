@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { normalizeAudioToWav, ensureOptimalAudioLength } = require('./ffmpeg');
-const { runWhisperStt } = require('./stt');
+const { transcribeAudio } = require('./stt');
 
 function resolvePath(relativePath) {
   if (!relativePath) return '';
@@ -10,11 +10,11 @@ function resolvePath(relativePath) {
 }
 
 class VoiceManager {
-  constructor(voicesDir, vocabularyPath, whisperConfig, chatterboxDir = '../chatterbox/voices') {
+  constructor(voicesDir, vocabularyPath, asrConfig, chatterboxDir = '../chatterbox/voices') {
     this.voicesDir = resolvePath(voicesDir);
     this.vocabularyPath = resolvePath(vocabularyPath);
     this.chatterboxDir = resolvePath(chatterboxDir);
-    this.whisperConfig = whisperConfig;
+    this.asrConfig = asrConfig;
     this.vocabulary = {};
     
     // Auto-create voicesDir if missing
@@ -98,7 +98,16 @@ class VoiceManager {
     // ZERO FILE DELETION RULE: Safely archive existing local file if replacing inside local voicesDir
     const existingFile = this.getVoiceFile(voiceId);
     const resolvedVoicesDir = path.resolve(this.voicesDir);
-    if (existingFile && existingFile !== targetWavPath && path.resolve(existingFile).startsWith(resolvedVoicesDir)) {
+    const isLocalReplaceable = existingFile
+      && existingFile !== targetWavPath
+      && path.resolve(existingFile).startsWith(resolvedVoicesDir);
+    // The existing local file is often the very file we are ingesting from (e.g. a
+    // bundled voices/name.mp3 being normalized to voices/name.wav). Archiving it up
+    // front moves FFmpeg's input out from under it, so defer that case until after
+    // the normalized WAV has been written.
+    const existingIsSource = existingFile && path.resolve(existingFile) === path.resolve(inputPath);
+
+    if (isLocalReplaceable && !existingIsSource) {
       console.log(`[Voices Safety] Archiving previous local voice file '${path.basename(existingFile)}'...`);
       this.safeArchiveFile(existingFile);
     }
@@ -106,15 +115,36 @@ class VoiceManager {
     // Step 1: Normalize audio format to 24kHz mono PCM WAV via FFmpeg into local voicesDir
     await normalizeAudioToWav(inputPath, targetWavPath);
 
+    if (isLocalReplaceable && existingIsSource) {
+      console.log(`[Voices Safety] Archiving previous local voice file '${path.basename(existingFile)}'...`);
+      this.safeArchiveFile(existingFile);
+    }
+
     // Step 2: Auto-concatenation if reference audio is too short (< 1.5s)
     await ensureOptimalAudioLength(targetWavPath);
 
-    // Step 3: Run Whisper STT for reference transcript
-    const transcript = await runWhisperStt(targetWavPath, this.whisperConfig);
-
-    // Step 4: Write sidecar .txt file and update vocabulary json
+    // Step 3: Transcribe the reference clip with the local ASR engine
     const sidecarTxt = path.join(this.voicesDir, `${voiceId}.txt`);
-    fs.writeFileSync(sidecarTxt, transcript, 'utf-8');
+    let transcript = await transcribeAudio(targetWavPath, this.asrConfig);
+
+    // A mismatched reference transcript wrecks zero-shot cloning, so never let a
+    // failed transcription overwrite a transcript that is already known-good.
+    if (!transcript) {
+      const knownTranscript = this.vocabulary[voiceId]?.transcript;
+      if (fs.existsSync(sidecarTxt)) {
+        transcript = fs.readFileSync(sidecarTxt, 'utf-8').trim();
+      }
+      else if (knownTranscript) {
+        transcript = knownTranscript;
+      }
+      if (!transcript) {
+        console.warn(`[Voices] No transcript available for '${voiceId}'. Cloning quality will suffer.`);
+        transcript = 'Speaker reference sample.';
+      }
+    }
+    else {
+      fs.writeFileSync(sidecarTxt, transcript, 'utf-8');
+    }
 
     this.vocabulary[voiceId] = {
       file: targetWavPath,

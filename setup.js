@@ -23,7 +23,7 @@ const MODEL_CATALOG = [
     name: "Higgs Audio v3 TTS Q8_0",
     family: "higgs_audio_tts",
     vram: "~4.80 GB",
-    features: "46 Native Paralinguistic Tags (<|emotion:...|>), Zero-Shot Voice Cloning",
+    features: "46 Native Paralinguistic Tags (<|emotion:...|>), Zero-Shot Voice Cloning, SSE Streaming",
     relPath: "models/Higgs-GGUF/higgs-audio-v3-tts-4b-q8_0.gguf",
     downloadUrl: "https://huggingface.co/audio-cpp/audio.cpp-gguf/resolve/main/Higgs-Audio-v3-TTS-4B-GGUF/higgs-audio-v3-tts-4b-q8_0.gguf"
   },
@@ -137,16 +137,20 @@ function ensureModelSidecars(modelPath, family) {
   }
 }
 
-async function ensureWhisperModel(audioCppDir) {
-  const whisperModelPath = resolvePath(path.join(audioCppDir, 'models/whisper-small.bin'));
-  if (!fs.existsSync(whisperModelPath)) {
-    const whisperUrl = 'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin';
-    console.log(`\n🎙️  Whisper STT Model Not Found. Auto-Downloading for GPU Voice Transcription...`);
+async function ensureParakeetModel(audioCppDir) {
+  const parakeetRelPath = 'models/Parakeet-TDT-0.6B-v3-GGUF/parakeet-tdt-0.6b-v3-q8_0.gguf';
+  const parakeetPath = resolvePath(path.join(audioCppDir, parakeetRelPath));
+  if (!fs.existsSync(parakeetPath)) {
+    const parakeetUrl = 'https://huggingface.co/audio-cpp/audio.cpp-gguf/resolve/main/Parakeet-TDT-0.6B-v3-GGUF/parakeet-tdt-0.6b-v3-q8_0.gguf';
+    console.log(`\n🎙️  Parakeet TDT ASR Model Not Found. Auto-Downloading for GPU Voice Transcription...`);
     try {
-      await downloadFile(whisperUrl, whisperModelPath);
+      await downloadFile(parakeetUrl, parakeetPath);
+      ensureModelSidecars(parakeetPath, 'parakeet_tdt');
     } catch (err) {
-      console.warn(`[Whisper Setup Warning] Could not auto-download Whisper model: ${err.message}`);
+      console.warn(`[Parakeet Setup Warning] Could not auto-download Parakeet model: ${err.message}`);
     }
+  } else {
+    ensureModelSidecars(parakeetPath, 'parakeet_tdt');
   }
 }
 
@@ -187,9 +191,11 @@ function runSetup() {
           if (!config.audio_cpp) config.audio_cpp = {};
           config.audio_cpp.working_dir = audioCppDir;
           config.audio_cpp.server_exe = newExePath;
-          config.whisper_cpp = {
-            cli_exe: path.join(audioCppDir, "build/windows-cuda-release/bin/whisper_cli.exe"),
-            model_path: path.join(audioCppDir, "models/whisper-small.bin")
+          config.asr = {
+            cli_exe: path.join(audioCppDir, "build/windows-cuda-release/bin/audiocpp_cli.exe"),
+            model_path: path.join(audioCppDir, "models/Parakeet-TDT-0.6B-v3-GGUF/parakeet-tdt-0.6b-v3-q8_0.gguf"),
+            family: "parakeet_tdt",
+            backend: "cuda"
           };
           resolvedServerExe = resolvePath(newExePath);
         }
@@ -201,8 +207,8 @@ function runSetup() {
   };
 
   checkAndPromptAudioCpp(async () => {
-    // Auto-ensure Whisper model exists for GPU STT
-    await ensureWhisperModel(audioCppDir);
+    // Auto-ensure Parakeet model exists for GPU STT
+    await ensureParakeetModel(audioCppDir);
 
     console.log("\nSelect the primary TTS model to enable for AIRI Audio Server:\n");
     MODEL_CATALOG.forEach(m => {
@@ -246,6 +252,16 @@ function runSetup() {
         path: modelFullPath,
         allow_unfiltered_tags: selected.family === 'fish_audio' || selected.family === 'higgs_audio_tts'
       };
+
+      // Ensure ASR configuration is set
+      if (!config.asr) {
+        config.asr = {
+          cli_exe: path.join(audioCppDir, "build/windows-cuda-release/bin/audiocpp_cli.exe"),
+          model_path: path.join(audioCppDir, "models/Parakeet-TDT-0.6B-v3-GGUF/parakeet-tdt-0.6b-v3-q8_0.gguf"),
+          family: "parakeet_tdt",
+          backend: "cuda"
+        };
+      }
 
       fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2), 'utf-8');
       console.log(`\nConfig updated successfully! Registered '${selected.id}' as primary model in config.json.\n`);

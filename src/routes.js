@@ -2,10 +2,39 @@ const express = require('express');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
-const { convertWavToOgg } = require('./ffmpeg');
-const { runWhisperStt } = require('./stt');
+const { convertWavToOgg, normalizeAudioToWav } = require('./ffmpeg');
+const { transcribeAudio } = require('./stt');
 
 const upload = multer({ dest: path.join(__dirname, '../temp_uploads') });
+
+/**
+ * Wrap raw PCM in a self-contained WAV container.
+ *
+ * Each streamed chunk is emitted as a complete WAV rather than a slice of one, so a
+ * browser client can decodeAudioData() every chunk on its own and schedule them in
+ * sequence. Slices of a single WAV would need MediaSource to play.
+ */
+function pcmToWav(pcmBuffer, sampleRate = 24000, channels = 1, bitsPerSample = 16) {
+  const byteRate = sampleRate * channels * (bitsPerSample / 8);
+  const blockAlign = channels * (bitsPerSample / 8);
+  const header = Buffer.alloc(44);
+
+  header.write('RIFF', 0);
+  header.writeUInt32LE(36 + pcmBuffer.length, 4);
+  header.write('WAVE', 8);
+  header.write('fmt ', 12);
+  header.writeUInt32LE(16, 16);           // PCM fmt chunk size
+  header.writeUInt16LE(1, 20);            // audio format: PCM
+  header.writeUInt16LE(channels, 22);
+  header.writeUInt32LE(sampleRate, 24);
+  header.writeUInt32LE(byteRate, 28);
+  header.writeUInt16LE(blockAlign, 32);
+  header.writeUInt16LE(bitsPerSample, 34);
+  header.write('data', 36);
+  header.writeUInt32LE(pcmBuffer.length, 40);
+
+  return Buffer.concat([header, pcmBuffer]);
+}
 
 function parseWavDuration(buffer) {
   if (buffer.length < 44) return 0;
@@ -20,9 +49,18 @@ function createRouter(engine, voiceManager, textProcessor, gpuQueue, config) {
   // GET /v1/models (OpenAI Specification)
   router.get('/v1/models', (req, res) => {
     const installed = config.installed_models || Object.keys(config.models);
+    const ids = [...installed];
+
+    // Advertise the ASR model too. OpenAI-compatible STT clients pick a transcription
+    // model from this list, and AIRI filters it for ids containing whisper/stt/asr/
+    // transcription, so a TTS-only catalog leaves its model picker empty.
+    if (config.asr && config.asr.model_path) {
+      ids.push(config.asr.model_id || 'parakeet-tdt-asr');
+    }
+
     res.json({
       object: 'list',
-      data: installed.map(id => ({
+      data: ids.map(id => ({
         id: id,
         object: 'model',
         created: 1700000000,
@@ -32,8 +70,10 @@ function createRouter(engine, voiceManager, textProcessor, gpuQueue, config) {
   });
 
   // GET Voice Discovery Waterfall (/v1/voices, /v1/audio/voices, /voices)
+  // AIRI's chatterbox provider reads `data.voices`, so the list is wrapped rather
+  // than returned as a bare array.
   const handleListVoices = (req, res) => {
-    res.json(voiceManager.listVoiceObjects());
+    res.json({ voices: voiceManager.listVoiceObjects() });
   };
   router.get('/v1/voices', handleListVoices);
   router.get('/v1/audio/voices', handleListVoices);
@@ -98,10 +138,20 @@ function createRouter(engine, voiceManager, textProcessor, gpuQueue, config) {
       if (!req.file) {
         return res.status(400).json({ error: { message: "No audio file provided." } });
       }
-      const transcript = await gpuQueue.enqueue(async () => {
-        return await runWhisperStt(req.file.path, config.whisper_cpp);
-      });
-      try { fs.unlinkSync(req.file.path); } catch (e) {}
+      // The ASR engine only reads PCM WAV, and clients commonly upload WebM/Opus or
+      // MP3, which it decodes as silence. Normalize first so any browser-recorded
+      // format transcribes instead of silently returning an empty string.
+      const normalizedPath = `${req.file.path}.wav`;
+      let transcript = '';
+      try {
+        await normalizeAudioToWav(req.file.path, normalizedPath);
+        transcript = await gpuQueue.enqueue(async () => {
+          return await transcribeAudio(normalizedPath, config.asr);
+        });
+      } finally {
+        try { fs.unlinkSync(req.file.path); } catch (e) {}
+        try { fs.unlinkSync(normalizedPath); } catch (e) {}
+      }
 
       res.json({ text: transcript });
     } catch (err) {
@@ -136,6 +186,67 @@ function createRouter(engine, voiceManager, textProcessor, gpuQueue, config) {
 
       // Clean emojis & filter/preserve tags based on model family
       const cleanedInput = textProcessor.process(input, modelCfg.family, shouldBypass);
+
+      // Incremental delivery: emit each generated chunk as a standalone WAV over SSE
+      // so the client can start playing before the whole utterance is synthesized.
+      if (req.body.stream_format === 'sse') {
+        const stamp = () => new Date().toISOString().slice(11, 23);
+        console.log(`[${stamp()}] [API] Streaming request received: model='${modelId}', voice='${voice}', chars=${input.length}`);
+        res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+        res.setHeader('Cache-Control', 'no-cache');
+        res.setHeader('Connection', 'keep-alive');
+        res.flushHeaders();
+
+        const tStreamStart = Date.now();
+        let firstChunkMs = null;
+        let queueWaitMs = null;
+        let audioMs = 0;
+
+        try {
+          await gpuQueue.enqueue(async () => {
+            queueWaitMs = Date.now() - tStreamStart;
+            console.log(`[${stamp()}] [API]   GPU queue acquired after ${queueWaitMs}ms`);
+            const voiceData = await voiceManager.resolveVoice(voice);
+            const tSynth = Date.now();
+            console.log(`[${stamp()}] [API]   voice resolved (+${tSynth - tStreamStart}ms), starting synthesis`);
+            return await engine.synthesizeStream(
+              cleanedInput,
+              modelId,
+              voiceData ? voiceData.file : null,
+              voiceData ? voiceData.transcript : '',
+              (pcmChunk, index) => {
+                if (firstChunkMs === null) firstChunkMs = Date.now() - tStreamStart;
+                const wav = pcmToWav(pcmChunk);
+                const chunkSec = (wav.length - 44) / (24000 * 2);
+                audioMs += chunkSec * 1000;
+                console.log(`[${stamp()}] [API]   chunk ${index} sent at +${Date.now() - tStreamStart}ms (${chunkSec.toFixed(2)}s audio)`);
+                res.write(`data: ${JSON.stringify({
+                  type: 'speech.audio.delta',
+                  index,
+                  audio: wav.toString('base64'),
+                })}\n\n`);
+              }
+            );
+          });
+
+          const totalMs = Date.now() - tStreamStart;
+          res.write(`data: ${JSON.stringify({
+            type: 'speech.audio.done',
+            timing: { ttft_ms: firstChunkMs, total_ms: totalMs },
+          })}\n\n`);
+          console.log(
+            `[${stamp()}] [API] Stream complete: queue ${queueWaitMs}ms, TTFT ${firstChunkMs}ms, `
+            + `total ${totalMs}ms for ${(audioMs / 1000).toFixed(2)}s audio `
+            + `(${(audioMs / totalMs).toFixed(2)}x realtime)`
+          );
+        } catch (err) {
+          console.error(`[Speech Stream Error] ${err.stack || err.message}`);
+          res.write(`data: ${JSON.stringify({ type: 'error', error: { message: err.message } })}\n\n`);
+        }
+
+        res.write('data: [DONE]\n\n');
+        return res.end();
+      }
 
       console.log(`[API] Speech Request: model='${modelId}', voice='${voice}' (requested: '${requestedVoice}'), fmt='${response_format}'`);
       const tStart = Date.now();

@@ -11,6 +11,60 @@ class AudioCppEngine {
     this.activeModel = null;
     this.activeVoice = null;
     this.lastLogs = [];
+    this.keepAliveTimer = null;
+    this.lastSynthesisAt = 0;
+    this.keepAliveInFlight = false;
+    // The raw arguments of the last real request. The warmer must replay these
+    // verbatim: initialize() hot-swaps whenever the voice differs, so a ping with a
+    // null voiceRef would restart the engine on every tick.
+    this.lastVoiceRef = null;
+    this.lastReferenceText = '';
+  }
+
+  noteSynthesis(voiceRef, referenceText) {
+    this.lastSynthesisAt = Date.now();
+    this.lastVoiceRef = voiceRef;
+    this.lastReferenceText = referenceText || '';
+  }
+
+  /**
+   * Synthesis is ~1.5s on a warm engine but ~15s once it has sat idle for under a
+   * minute, even though the weights stay resident in VRAM the whole time. A tiny
+   * throwaway generation on an interval keeps it in the fast state.
+   * Disabled when keep_alive_interval_ms <= 0 (default: 0).
+   */
+  startKeepAlive() {
+    const intervalMs = this.config.audio_cpp?.keep_alive_interval_ms ?? 0;
+    if (intervalMs <= 0 || this.keepAliveTimer) return;
+
+    this.keepAliveTimer = setInterval(() => {
+      if (!this.isReady || !this.process) return;
+      // A real request already keeps the engine warm; only fill in the gaps.
+      if (Date.now() - this.lastSynthesisAt < intervalMs) return;
+      if (this.keepAliveInFlight) return;
+
+      // Ping the voice that is actually loaded, not the last one requested. When two
+      // voices alternate those differ, and initialize() would hot-swap the engine on
+      // every tick — the exact stall the warmer exists to prevent.
+      const model = this.activeModel;
+      const voice = this.activeVoice;
+      if (!model) return;
+
+      this.keepAliveInFlight = true;
+      this.synthesize('Hm.', model, voice, this.lastReferenceText)
+        .catch(() => {})
+        .finally(() => { this.keepAliveInFlight = false; });
+    }, intervalMs);
+
+    // Never hold the event loop open on account of the warmer.
+    if (this.keepAliveTimer.unref) this.keepAliveTimer.unref();
+  }
+
+  stopKeepAlive() {
+    if (this.keepAliveTimer) {
+      clearInterval(this.keepAliveTimer);
+      this.keepAliveTimer = null;
+    }
   }
 
   logMessage(msg) {
@@ -47,7 +101,18 @@ class AudioCppEngine {
     if (process.env.CUDA_PATH) {
       return path.join(process.env.CUDA_PATH, 'bin');
     }
-    return "C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v13.1\\bin\\x64";
+    // Auto-detect any installed CUDA version from the standard toolkit directory
+    const cudaToolkitDir = 'C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA';
+    if (fs.existsSync(cudaToolkitDir)) {
+      const versions = fs.readdirSync(cudaToolkitDir).filter(v => v.startsWith('v')).sort().reverse();
+      if (versions.length > 0) {
+        const detectedPath = path.join(cudaToolkitDir, versions[0], 'bin');
+        console.log(`[Engine] Auto-detected CUDA: ${detectedPath}`);
+        return detectedPath;
+      }
+    }
+    console.warn('[Engine] WARNING: CUDA toolkit not found. Set CUDA_PATH environment variable or cuda_path in config.json.');
+    return '';
   }
 
   getDefaultModelId() {
@@ -93,7 +158,9 @@ class AudioCppEngine {
     // Stop existing server process if model or voice preset changed
     if (this.process && (this.activeModel !== modelId || this.activeVoice !== resolvedVoiceRef)) {
       console.log(`[Engine] Hot-swapping audio.cpp for model '${modelId}'...`);
-      this.stop();
+      // Wait for the old process to actually exit before spawning its replacement,
+      // otherwise the two race for the internal port.
+      await this.waitForExit(this.stop());
     }
 
     if (this.process && this.isReady) {
@@ -115,7 +182,10 @@ class AudioCppEngine {
           family: modelConfig.family,
           path: resolvedModelPath,
           task: 'tts',
-          mode: 'offline',
+          // Streaming sessions also serve ordinary non-SSE requests, so this is safe
+          // for the buffered path and enables SSE for callers that ask for it. Models
+          // whose audio.cpp integration lacks streaming can opt out via config.
+          mode: modelConfig.mode || 'streaming',
           session_options: {
             cuda_graphs: 'true',
             mem_saver: 'true'
@@ -180,7 +250,11 @@ class AudioCppEngine {
       }
     });
 
+    // Captured so a late 'exit' from a superseded process cannot clear the state of
+    // whichever process is current by the time it fires.
+    const spawnedChild = this.process;
     this.process.on('exit', (code) => {
+      if (this.process !== spawnedChild) return;
       console.log(`[Engine] audiocpp_server process exited with code ${code}`);
       this.isReady = false;
       this.process = null;
@@ -190,6 +264,7 @@ class AudioCppEngine {
     await this.pollHealthCheck();
     this.isReady = true;
     console.log(`[Engine] audiocpp_server is READY (${modelId})!`);
+    this.startKeepAlive();
     return modelId;
   }
 
@@ -222,6 +297,7 @@ class AudioCppEngine {
   }
 
   async synthesize(promptInput, modelIdInput = null, voiceRef = null, referenceText = '') {
+    this.noteSynthesis(voiceRef, referenceText);
     const resolvedModelId = await this.initialize(modelIdInput, voiceRef, referenceText);
     const resolvedVoiceRef = voiceRef ? this.resolvePath(voiceRef) : null;
 
@@ -268,18 +344,131 @@ class AudioCppEngine {
     });
   }
 
-  stop() {
-    if (this.process) {
-      try {
-        if (process.platform === 'win32') {
-          execSync(`taskkill /pid ${this.process.pid} /T /F`);
-        } else {
-          this.process.kill();
+  /**
+   * Synthesize with incremental delivery.
+   *
+   * Consumes audio.cpp's OpenAI-style SSE stream and invokes onChunk(pcmBuffer) for
+   * each `speech.audio.delta` as it is produced, rather than waiting for the whole
+   * utterance. Resolves once the stream completes.
+   */
+  async synthesizeStream(promptInput, modelIdInput, voiceRef, referenceText, onChunk) {
+    this.noteSynthesis(voiceRef, referenceText);
+    const resolvedModelId = await this.initialize(modelIdInput, voiceRef, referenceText);
+    const resolvedVoiceRef = voiceRef ? this.resolvePath(voiceRef) : null;
+
+    // How much audio the engine decodes before handing a piece back, in codec frames of
+    // 40ms each. This no longer splits the text — the whole reply is one generation —
+    // so lowering it costs decoder overhead but never prosody.
+    const streamFrameInterval = this.config.audio_cpp?.stream_frame_interval || 25;
+
+    const payload = JSON.stringify({
+      model: resolvedModelId,
+      input: promptInput,
+      stream_format: 'sse',
+      options: { stream_frame_interval: String(streamFrameInterval) },
+      ...(resolvedVoiceRef ? { voice_ref: resolvedVoiceRef, reference_text: referenceText } : {})
+    });
+
+    return new Promise((resolve, reject) => {
+      const req = http.request(`http://127.0.0.1:${this.config.audio_cpp?.internal_port || 8080}/v1/audio/speech`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(payload)
+        },
+        timeout: 300000
+      }, (res) => {
+        if (res.statusCode !== 200) {
+          const chunks = [];
+          res.on('data', c => chunks.push(c));
+          res.on('end', () => reject(new Error(
+            `Streaming synthesis failed with HTTP ${res.statusCode}: ${Buffer.concat(chunks).toString().slice(0, 300)}`
+          )));
+          return;
         }
-      } catch (e) {}
-      this.process = null;
-      this.isReady = false;
+
+        let buffered = '';
+        let chunkCount = 0;
+
+        res.on('data', (data) => {
+          buffered += data.toString();
+          // SSE frames are newline-delimited; keep any partial trailing line.
+          const lines = buffered.split('\n');
+          buffered = lines.pop() || '';
+
+          for (const line of lines) {
+            if (!line.startsWith('data:')) continue;
+            const body = line.slice(5).trim();
+            if (!body || body === '[DONE]') continue;
+
+            let event;
+            try {
+              event = JSON.parse(body);
+            } catch (e) {
+              continue;
+            }
+
+            if (event.type === 'speech.audio.delta' && event.audio) {
+              chunkCount++;
+              onChunk(Buffer.from(event.audio, 'base64'), chunkCount);
+            }
+          }
+        });
+
+        res.on('end', () => resolve({ chunkCount }));
+        res.on('error', err => reject(new Error(`Streaming synthesis error: ${err.message}`)));
+      });
+
+      req.on('error', err => reject(new Error(`Streaming synthesis network error: ${err.message}`)));
+      req.on('timeout', () => {
+        req.destroy();
+        reject(new Error('Streaming synthesis timed out after 300s.'));
+      });
+
+      req.write(payload);
+      req.end();
+    });
+  }
+
+  stop() {
+    this.stopKeepAlive();
+    const child = this.process;
+    if (!child) return null;
+
+    // Detach the handlers before killing. A terminating process still flushes
+    // buffered stdout and fires 'exit' asynchronously, and those late callbacks
+    // would otherwise clear state belonging to the replacement process.
+    this.process = null;
+    this.isReady = false;
+    try {
+      if (child.stdout) child.stdout.removeAllListeners('data');
+      if (child.stderr) child.stderr.removeAllListeners('data');
+      child.removeAllListeners('exit');
+
+      if (process.platform === 'win32') {
+        execSync(`taskkill /pid ${child.pid} /T /F`);
+      } else {
+        child.kill();
+      }
+    } catch (e) {}
+
+    return child;
+  }
+
+  waitForExit(child, timeoutMs = 10000) {
+    if (!child || child.exitCode !== null || child.signalCode !== null) {
+      return Promise.resolve();
     }
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => {
+        try { child.kill('SIGKILL'); } catch (e) {}
+        resolve();
+      }, timeoutMs);
+      child.once('exit', () => {
+        clearTimeout(timer);
+        resolve();
+      });
+    });
   }
 }
 

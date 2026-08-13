@@ -1,27 +1,28 @@
 {
   "port": 8095,
   "host": "0.0.0.0",
-  "cuda_path": "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v13.1/bin/x64",
   "audio_cpp": {
     "server_exe": "../audio.cpp/build/windows-cuda-release/bin/audiocpp_server.exe",
     "working_dir": "../audio.cpp",
-    "internal_port": 8080
+    "internal_port": 8080,
+    "stream_frame_interval": 25,
+    "keep_alive_interval_ms": 0
   },
-  "whisper_cpp": {
-    "cli_exe": "../audio.cpp/build/windows-cuda-release/bin/whisper_cli.exe",
-    "model_path": "../audio.cpp/models/whisper-small.bin"
+  "asr": {
+    "cli_exe": "../audio.cpp/build/windows-cuda-release/bin/audiocpp_cli.exe",
+    "model_path": "../audio.cpp/models/Parakeet-TDT-0.6B-v3-GGUF/parakeet-tdt-0.6b-v3-q8_0.gguf",
+    "family": "parakeet_tdt",
+    "backend": "cuda"
   },
   "chatterbox_voices_dir": "../chatterbox/voices",
   "installed_models": [
-    "omnivoice-tts",
-    "fish-audio-tts",
-    "higgs-audio-tts"
+    "fish-audio-tts"
   ],
   "models": {
     "omnivoice-tts": {
       "family": "omnivoice",
       "path": "../audio.cpp/models/OmniVoice-GGUF/omnivoice-q8_0.gguf",
-      "allow_unfiltered_tags": false
+      "allow_unfiltered_tags": true
     },
     "fish-audio-tts": {
       "family": "fish_audio",
@@ -30,7 +31,7 @@
     },
     "higgs-audio-tts": {
       "family": "higgs_audio_tts",
-      "path": "../audio.cpp/models/Higgs-GGUF/higgs-audio-q8_0.gguf",
+      "path": "../audio.cpp/models/Higgs-GGUF/higgs-audio-v3-tts-4b-q8_0.gguf",
       "allow_unfiltered_tags": true
     }
   }

@@ -7,13 +7,15 @@
     "start": "node src/server.js",
     "setup": "node setup.js",
     "add-model": "node setup.js",
+    "transcribe-voices": "node tools/transcribe-voices.js",
     "test": "node test.js"
   },
   "keywords": [
     "airi",
     "tts",
     "audio-cpp",
-    "whisper-cpp",
+    "asr",
+    "parakeet-tdt",
     "cuda",
     "openai-api"
   ],

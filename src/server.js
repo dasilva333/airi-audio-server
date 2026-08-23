@@ -1,8 +1,49 @@
+const fs = require('fs');
 const path = require('path');
+const { spawnSync } = require('child_process');
 const express = require('express');
 const cors = require('cors');
 
-const config = require('../config.json');
+const configPath = path.join(__dirname, '../config.json');
+const exampleConfigPath = path.join(__dirname, '../config.example.json');
+
+function loadOrCreateConfig() {
+  if (fs.existsSync(configPath)) {
+    try {
+      return JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+    } catch (e) {
+      console.error(`[AIRI Audio Server] Error parsing config.json: ${e.message}`);
+      process.exit(1);
+    }
+  }
+
+  // config.json does not exist. Check if we can run interactive setup wizard
+  const isInteractive = Boolean(process.stdin.isTTY && process.stdout.isTTY);
+  if (isInteractive) {
+    console.log('[AIRI Audio Server] config.json not found. Launching setup wizard...\n');
+    const setupScript = path.join(__dirname, '../setup.js');
+    spawnSync(process.execPath, [setupScript], {
+      stdio: 'inherit',
+      env: { ...process.env, AIRI_CALLED_FROM_SERVER: '1' }
+    });
+    if (fs.existsSync(configPath)) {
+      try {
+        return JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+      } catch (e) {}
+    }
+  }
+
+  // If non-interactive or setup didn't finish, auto-create from config.example.json
+  if (fs.existsSync(exampleConfigPath)) {
+    console.log('[AIRI Audio Server] Initializing config.json from config.example.json template...');
+    fs.copyFileSync(exampleConfigPath, configPath);
+    return JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+  }
+
+  throw new Error('Neither config.json nor config.example.json could be found.');
+}
+
+const config = loadOrCreateConfig();
 const UnifiedGpuQueue = require('./queue');
 const TextProcessor = require('./text');
 const AudioCppEngine = require('./engine');

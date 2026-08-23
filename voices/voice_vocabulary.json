@@ -3,8 +3,20 @@
     "file": "../chatterbox/voices/morgan-freeman.wav",
     "transcript": "Hope is a good thing, maybe the best of things, and no good thing ever dies."
   },
+  "snoop-dogg": {
+    "file": "voices/snoop-dogg.wav",
+    "transcript": "motherfucking servers down get that shit back up we trying to play a bunch of motherfuckers at home that's locked and loaded right now fix this shit"
+  },
   "trump-2": {
-    "file": "C:\\Users\\h4rdc\\Documents\\Github\\coding-agent\\airi-audio-server\\voices\\trump-2.wav",
-    "transcript": "Speaker reference sample."
+    "file": "voices/trump-2.wav",
+    "transcript": "You gotta get out to vote."
+  },
+  "rick_sanchez": {
+    "file": "voices/rick_sanchez.wav",
+    "transcript": "You know, Grandpa goes around and he does his business in public because Grandpa isn't shady."
+  },
+  "david-attenborough": {
+    "file": "voices/david-attenborough.wav",
+    "transcript": "Mae'r unrhyw o'r cyfnodd cyfnodd yn ymddangos, yn ymddangos, ac yn ymddangos, yn ymddangos."
   }
 }

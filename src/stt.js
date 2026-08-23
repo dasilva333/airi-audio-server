@@ -9,6 +9,76 @@ function resolvePath(relativePath) {
   return path.resolve(__dirname, '..', relativePath);
 }
 
+function getCudaPaths(customCudaPath) {
+  const detectedPaths = new Set();
+  const baseCandidates = [];
+
+  if (customCudaPath) {
+    if (Array.isArray(customCudaPath)) {
+      customCudaPath.forEach(p => baseCandidates.push(resolvePath(p)));
+    } else {
+      baseCandidates.push(resolvePath(customCudaPath));
+    }
+  }
+  if (process.env.CUDA_PATH) baseCandidates.push(process.env.CUDA_PATH);
+  if (process.env.CUDA_HOME) baseCandidates.push(process.env.CUDA_HOME);
+
+  Object.keys(process.env)
+    .filter(k => k.startsWith('CUDA_PATH_V'))
+    .sort((a, b) => b.localeCompare(a))
+    .forEach(k => baseCandidates.push(process.env[k]));
+
+  const standardToolkitDir = 'C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA';
+  if (fs.existsSync(standardToolkitDir)) {
+    try {
+      const versions = fs.readdirSync(standardToolkitDir).filter(v => v.startsWith('v'));
+      versions.sort((a, b) => {
+        const numA = parseFloat(a.replace(/^v/, '')) || 0;
+        const numB = parseFloat(b.replace(/^v/, '')) || 0;
+        return numB - numA;
+      });
+      versions.forEach(v => baseCandidates.push(path.join(standardToolkitDir, v)));
+    } catch (e) {}
+  }
+
+  if (process.platform !== 'win32') {
+    ['/usr/local/cuda', '/usr/local/cuda-13', '/usr/local/cuda-12', '/usr/local/cuda-11', '/opt/cuda'].forEach(p => {
+      if (fs.existsSync(p)) baseCandidates.push(p);
+    });
+  }
+
+  const subdirs = [
+    path.join('bin', 'x64'),
+    'bin',
+    path.join('nvvm', 'bin', 'x64'),
+    'libnvvp'
+  ];
+
+  baseCandidates.forEach(base => {
+    if (!base) return;
+    let root = base;
+    const lower = base.toLowerCase();
+    if (lower.endsWith(path.join('bin', 'x64').toLowerCase()) || lower.endsWith('/bin/x64') || lower.endsWith('\\bin\\x64')) {
+      root = path.dirname(path.dirname(base));
+    } else if (lower.endsWith(path.sep + 'bin') || lower.endsWith('/bin') || lower.endsWith('\\bin')) {
+      root = path.dirname(base);
+    }
+
+    subdirs.forEach(sub => {
+      const candidate = path.join(root, sub);
+      if (fs.existsSync(candidate)) {
+        detectedPaths.add(candidate);
+      }
+    });
+
+    if (fs.existsSync(base)) {
+      detectedPaths.add(base);
+    }
+  });
+
+  return Array.from(detectedPaths);
+}
+
 /**
  * Transcribe an audio file with the local audio.cpp ASR engine.
  *
@@ -44,6 +114,10 @@ function transcribeAudio(audioPath, asrConfig) {
     const outFile = path.join(os.tmpdir(), `airi-asr-${process.pid}-${Date.now()}.txt`);
     console.log(`[ASR] Transcribing ${path.basename(resolvedAudio)} via ${family}...`);
 
+    const binDir = path.dirname(cliExe);
+    const cudaPaths = getCudaPaths(cfg.cuda_path);
+    const envPath = [binDir, ...cudaPaths, process.env.PATH].filter(Boolean).join(path.delimiter);
+
     const proc = spawn(cliExe, [
       '--task', 'asr',
       '--family', family,
@@ -51,7 +125,12 @@ function transcribeAudio(audioPath, asrConfig) {
       '--backend', backend,
       '--audio', resolvedAudio,
       '--text-out', outFile,
-    ]);
+    ], {
+      env: {
+        ...process.env,
+        PATH: envPath
+      }
+    });
 
     let stdout = '';
     let stderr = '';

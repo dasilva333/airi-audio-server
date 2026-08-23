@@ -159,10 +159,15 @@ function runSetup() {
   console.log("      AIRI Audio Server - Interactive Model Setup Wizard      ");
   console.log("=".repeat(60));
 
+  const EXAMPLE_CONFIG_PATH = path.join(__dirname, 'config.example.json');
   let config = {};
   if (fs.existsSync(CONFIG_PATH)) {
     try {
       config = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf-8'));
+    } catch (e) {}
+  } else if (fs.existsSync(EXAMPLE_CONFIG_PATH)) {
+    try {
+      config = JSON.parse(fs.readFileSync(EXAMPLE_CONFIG_PATH, 'utf-8'));
     } catch (e) {}
   }
 
@@ -266,13 +271,14 @@ function runSetup() {
       fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2), 'utf-8');
       console.log(`\nConfig updated successfully! Registered '${selected.id}' as primary model in config.json.\n`);
 
-      console.log("Starting AIRI Audio Server...");
       rl.close();
 
-      // Start server
-      try {
-        execSync('npm start', { stdio: 'inherit', cwd: __dirname });
-      } catch (e) {}
+      if (process.env.AIRI_CALLED_FROM_SERVER !== '1') {
+        console.log("Starting AIRI Audio Server...");
+        try {
+          execSync('npm start', { stdio: 'inherit', cwd: __dirname });
+        } catch (e) {}
+      }
     });
   });
 }

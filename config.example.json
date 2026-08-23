@@ -16,22 +16,27 @@
   },
   "chatterbox_voices_dir": "../chatterbox/voices",
   "installed_models": [
+    "higgs-audio-tts",
+    "omnivoice-tts",
     "fish-audio-tts"
   ],
   "models": {
+    "higgs-audio-tts": {
+      "family": "higgs_audio_tts",
+      "path": "../audio.cpp/models/Higgs-GGUF/higgs-audio-v3-tts-4b-q8_0.gguf",
+      "mode": "offline",
+      "allow_unfiltered_tags": true
+    },
     "omnivoice-tts": {
       "family": "omnivoice",
       "path": "../audio.cpp/models/OmniVoice-GGUF/omnivoice-q8_0.gguf",
+      "mode": "streaming",
       "allow_unfiltered_tags": true
     },
     "fish-audio-tts": {
       "family": "fish_audio",
       "path": "../audio.cpp/models/Fish-Audio-S2-Pro-GGUF/fish-audio-s2-pro-q8_0.gguf",
-      "allow_unfiltered_tags": true
-    },
-    "higgs-audio-tts": {
-      "family": "higgs_audio_tts",
-      "path": "../audio.cpp/models/Higgs-GGUF/higgs-audio-v3-tts-4b-q8_0.gguf",
+      "mode": "offline",
       "allow_unfiltered_tags": true
     }
   }

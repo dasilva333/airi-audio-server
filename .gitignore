@@ -6,4 +6,5 @@ test_output.ogg
 *.ogg
 !voices/*.ogg
 .env
+config.json
 .DS_Store

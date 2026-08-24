@@ -24,7 +24,7 @@
     "higgs-audio-tts": {
       "family": "higgs_audio_tts",
       "path": "../audio.cpp/models/Higgs-GGUF/higgs-audio-v3-tts-4b-q8_0.gguf",
-      "mode": "offline",
+      "mode": "streaming",
       "allow_unfiltered_tags": true
     },
     "omnivoice-tts": {

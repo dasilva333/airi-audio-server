@@ -264,7 +264,7 @@ class AudioCppEngine {
           // Streaming sessions also serve ordinary non-SSE requests, so this is safe
           // for the buffered path and enables SSE for callers that ask for it. Models
           // whose audio.cpp integration lacks streaming can opt out via config.
-          mode: modelConfig.mode || (['fish_audio', 'higgs_audio_tts', 'higgs'].includes(modelConfig.family) ? 'offline' : 'streaming'),
+          mode: modelConfig.mode || (modelConfig.family === 'fish_audio' ? 'offline' : 'streaming'),
           session_options: {
             cuda_graphs: 'true',
             mem_saver: 'true'

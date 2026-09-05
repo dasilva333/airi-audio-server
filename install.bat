@@ -30,12 +30,12 @@ if not exist "..\audio.cpp" (
 echo:
 
 set NEED_BUILD=0
-if not exist "..\audio.cpp\build\windows-cuda-release\bin\audiocpp_server.exe" set NEED_BUILD=1
-if not exist "..\audio.cpp\build\windows-cuda-release\bin\audiocpp_cli.exe" set NEED_BUILD=1
+if not exist "..\audio.cpp\build\windows-cuda-release\bin\audiocpp_server.exe" if not exist "bin\windows-cuda\audiocpp_server.exe" set NEED_BUILD=1
+if not exist "..\audio.cpp\build\windows-cuda-release\bin\audiocpp_cli.exe" if not exist "bin\windows-cuda\audiocpp_cli.exe" set NEED_BUILD=1
 
 if exist "..\audio.cpp" (
     if "%NEED_BUILD%"=="1" (
-        echo [4/5] Compiling audio.cpp CUDA binaries (audiocpp_server, audiocpp_cli with Parakeet ASR) via CMake...
+        echo [4/5] Compiling audio.cpp CUDA binaries [audiocpp_server, audiocpp_cli with Parakeet ASR] via CMake...
         cd /d "..\audio.cpp"
         cmake -B build/windows-cuda-release -DGGML_CUDA=ON
         cmake --build build/windows-cuda-release --config Release --parallel

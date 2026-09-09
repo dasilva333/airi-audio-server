@@ -89,8 +89,9 @@ function getCudaPaths(customCudaPath) {
  */
 function transcribeAudio(audioPath, asrConfig) {
   return new Promise((resolve) => {
+    const { resolveEngineBinary } = require('./gpu');
     const cfg = asrConfig || {};
-    const cliExe = resolvePath(cfg.cli_exe);
+    const cliExe = resolveEngineBinary('audiocpp_cli', cfg.cli_exe);
     const modelPath = resolvePath(cfg.model_path);
     const family = cfg.family || 'parakeet_tdt';
     const backend = cfg.backend || 'cuda';

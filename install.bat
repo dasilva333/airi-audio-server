@@ -41,7 +41,7 @@ if exist "..\audio.cpp" (
         cmake --build build/windows-cuda-release --config Release --parallel
         cd /d "%~dp0"
     ) else (
-        echo [4/5] audiocpp_server.exe and audiocpp_cli.exe CUDA binaries verified.
+        echo [4/5] Pre-compiled multi-generation CUDA binaries verified [sm75, sm86, sm89, sm120].
     )
 )
 echo:

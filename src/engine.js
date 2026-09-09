@@ -81,17 +81,11 @@ class AudioCppEngine {
   }
 
   getServerExePath() {
-    if (this.config.audio_cpp?.server_exe) {
-      const configuredPath = this.resolvePath(this.config.audio_cpp.server_exe);
-      if (fs.existsSync(configuredPath)) return configuredPath;
-    }
-    // Bundled Pre-built Binary Fallback
-    const bundledPath = path.resolve(__dirname, '../bin/windows-cuda/audiocpp_server.exe');
-    if (fs.existsSync(bundledPath)) {
-      console.log(`[Engine] Using bundled pre-compiled binary: ${bundledPath}`);
-      return bundledPath;
-    }
-    throw new Error(`audiocpp_server executable not found.`);
+    const { resolveEngineBinary } = require('./gpu');
+    const configured = this.config.audio_cpp?.server_exe;
+    const resolved = resolveEngineBinary('audiocpp_server', configured);
+    if (resolved) return resolved;
+    throw new Error('audiocpp_server executable not found. Please verify bin/windows-cuda/ or compile audio.cpp.');
   }
 
   getCudaPaths() {

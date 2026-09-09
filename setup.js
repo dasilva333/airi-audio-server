@@ -171,8 +171,9 @@ function runSetup() {
     } catch (e) {}
   }
 
+  const { resolveEngineBinary } = require('./src/gpu');
   let audioCppDir = config.audio_cpp?.working_dir || "../audio.cpp";
-  let resolvedServerExe = resolvePath(config.audio_cpp?.server_exe || path.join(audioCppDir, "build/windows-cuda-release/bin/audiocpp_server.exe"));
+  let resolvedServerExe = resolveEngineBinary('audiocpp_server', config.audio_cpp?.server_exe) || resolvePath(config.audio_cpp?.server_exe || path.join(audioCppDir, "build/windows-cuda-release/bin/audiocpp_server.exe"));
 
   const rl = readline.createInterface({
     input: process.stdin,

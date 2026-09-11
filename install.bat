@@ -35,7 +35,7 @@ if not exist "..\audio.cpp\build\windows-cuda-release\bin\audiocpp_cli.exe" if n
 
 if exist "..\audio.cpp" (
     if "%NEED_BUILD%"=="1" (
-        echo [4/5] Compiling audio.cpp CUDA binaries [audiocpp_server, audiocpp_cli with Parakeet ASR] via CMake...
+        echo [4/5] Compiling audio.cpp CUDA binaries [audiocpp_server, audiocpp_cli with Citrinet ASR] via CMake...
         cd /d "..\audio.cpp"
         cmake -B build/windows-cuda-release -DGGML_CUDA=ON
         cmake --build build/windows-cuda-release --config Release --parallel
@@ -46,6 +46,6 @@ if exist "..\audio.cpp" (
 )
 echo:
 
-echo [5/5] Launching Interactive Setup Wizard (Provisions Parakeet ASR and TTS Models)...
+echo [5/5] Launching Interactive Setup Wizard (Provisions Citrinet ASR and TTS Models)...
 node setup.js
 pause

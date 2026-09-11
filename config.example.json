@@ -9,9 +9,9 @@
     "keep_alive_interval_ms": 0
   },
   "asr": {
-    "cli_exe": "../audio.cpp/build/windows-cuda-release/bin/audiocpp_cli.exe",
-    "model_path": "../audio.cpp/models/Parakeet-TDT-0.6B-v3-GGUF/parakeet-tdt-0.6b-v3-q8_0.gguf",
-    "family": "parakeet_tdt",
+    "cli_exe": "bin/windows-cuda/audiocpp_cli.exe",
+    "model_path": "models/Citrinet-ASR-GGUF/citrinet-asr-q8_0.gguf",
+    "family": "citrinet_asr",
     "backend": "cuda"
   },
   "chatterbox_voices_dir": "../chatterbox/voices",

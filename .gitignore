@@ -8,3 +8,15 @@ test_output.ogg
 .env
 config.json
 .DS_Store
+
+voices/personal_*
+*.gguf
+models/
+
+# Scratch & benchmark scripts
+*_shootout.js
+shootout.js
+benchmark_*.js
+download_*.js
+test_*.js
+run_*.js

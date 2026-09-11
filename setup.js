@@ -82,8 +82,8 @@ function downloadFile(url, targetPath) {
       fs.mkdirSync(dir, { recursive: true });
     }
 
-    console.log(`\n📥 Auto-Downloading weights...`);
-    console.log(`URL   : ${url}`);
+    console.log(`Starting download from official source...`);
+    console.log(`URL: ${url}`);
     console.log(`Target: ${targetPath}\n`);
 
     const request = (currentUrl) => {
@@ -147,20 +147,19 @@ function ensureModelSidecars(modelPath, family) {
   }
 }
 
-async function ensureParakeetModel(audioCppDir) {
-  const parakeetRelPath = 'models/Parakeet-TDT-0.6B-v3-GGUF/parakeet-tdt-0.6b-v3-q8_0.gguf';
-  const parakeetPath = resolvePath(path.join(audioCppDir, parakeetRelPath));
-  if (!fs.existsSync(parakeetPath)) {
-    const parakeetUrl = 'https://huggingface.co/audio-cpp/audio.cpp-gguf/resolve/main/Parakeet-TDT-0.6B-v3-GGUF/parakeet-tdt-0.6b-v3-q8_0.gguf';
-    console.log(`\n🎙️  Parakeet TDT ASR Model Not Found. Auto-Downloading for GPU Voice Transcription...`);
+async function ensureCitrinetModel() {
+  const citrinetPath = resolvePath('models/Citrinet-ASR-GGUF/citrinet-asr-q8_0.gguf');
+  if (!fs.existsSync(citrinetPath) || fs.statSync(citrinetPath).size < 10000000) {
+    const citrinetUrl = 'https://huggingface.co/onnx-community/citrinet-asr-GGUF/resolve/main/citrinet-asr-q8_0.gguf';
+    console.log(`\n🎙️  Citrinet ASR Model Not Found (40.5 MB). Auto-Downloading for GPU Voice Transcription...`);
     try {
-      await downloadFile(parakeetUrl, parakeetPath);
-      ensureModelSidecars(parakeetPath, 'parakeet_tdt');
+      await downloadFile(citrinetUrl, citrinetPath);
+      ensureModelSidecars(citrinetPath, 'citrinet_asr');
     } catch (err) {
-      console.warn(`[Parakeet Setup Warning] Could not auto-download Parakeet model: ${err.message}`);
+      console.warn(`[Citrinet Setup Warning] Could not auto-download Citrinet model: ${err.message}`);
     }
   } else {
-    ensureModelSidecars(parakeetPath, 'parakeet_tdt');
+    ensureModelSidecars(citrinetPath, 'citrinet_asr');
   }
 }
 
@@ -207,12 +206,6 @@ function runSetup() {
           if (!config.audio_cpp) config.audio_cpp = {};
           config.audio_cpp.working_dir = audioCppDir;
           config.audio_cpp.server_exe = newExePath;
-          config.asr = {
-            cli_exe: path.join(audioCppDir, "build/windows-cuda-release/bin/audiocpp_cli.exe"),
-            model_path: path.join(audioCppDir, "models/Parakeet-TDT-0.6B-v3-GGUF/parakeet-tdt-0.6b-v3-q8_0.gguf"),
-            family: "parakeet_tdt",
-            backend: "cuda"
-          };
           resolvedServerExe = resolvePath(newExePath);
         }
         callback();
@@ -223,8 +216,8 @@ function runSetup() {
   };
 
   checkAndPromptAudioCpp(async () => {
-    // Auto-ensure Parakeet model exists for GPU STT
-    await ensureParakeetModel(audioCppDir);
+    // Auto-ensure Citrinet ASR model exists for GPU STT
+    await ensureCitrinetModel();
 
     console.log("\nSelect the primary TTS model to enable for AIRI Audio Server:\n");
     MODEL_CATALOG.forEach(m => {
@@ -269,12 +262,12 @@ function runSetup() {
         allow_unfiltered_tags: selected.family === 'fish_audio' || selected.family === 'higgs_audio_tts'
       };
 
-      // Ensure ASR configuration is set
-      if (!config.asr) {
+      // Ensure ASR configuration is set to native Citrinet ASR
+      if (!config.asr || config.asr.family === 'parakeet_tdt') {
         config.asr = {
-          cli_exe: path.join(audioCppDir, "build/windows-cuda-release/bin/audiocpp_cli.exe"),
-          model_path: path.join(audioCppDir, "models/Parakeet-TDT-0.6B-v3-GGUF/parakeet-tdt-0.6b-v3-q8_0.gguf"),
-          family: "parakeet_tdt",
+          cli_exe: "bin/windows-cuda/audiocpp_cli.exe",
+          model_path: "models/Citrinet-ASR-GGUF/citrinet-asr-q8_0.gguf",
+          family: "citrinet_asr",
           backend: "cuda"
         };
       }

@@ -87,31 +87,57 @@ function getCudaPaths(customCudaPath) {
  * empty string on any failure: a wrong transcript degrades zero-shot cloning
  * more than a missing one, so callers decide what to fall back to.
  */
-function transcribeAudio(audioPath, asrConfig) {
+async function transcribeAudio(audioPath, asrConfig) {
+  const { resolveEngineBinary } = require('./gpu');
+  const { normalizeAudioToWav } = require('./ffmpeg');
+  const cfg = asrConfig || {};
+  const cliExe = resolveEngineBinary('audiocpp_cli', cfg.cli_exe);
+
+  // Auto-migrate legacy parakeet_tdt or default to native citrinet_asr
+  let family = cfg.family || 'citrinet_asr';
+  let modelRel = cfg.model_path || 'models/Citrinet-ASR-GGUF/citrinet-asr-q8_0.gguf';
+  if (family === 'parakeet_tdt') {
+    const citrinetModel = resolvePath('models/Citrinet-ASR-GGUF/citrinet-asr-q8_0.gguf');
+    if (fs.existsSync(citrinetModel)) {
+      family = 'citrinet_asr';
+      modelRel = 'models/Citrinet-ASR-GGUF/citrinet-asr-q8_0.gguf';
+    }
+  }
+
+  const modelPath = resolvePath(modelRel);
+  const backend = cfg.backend || 'cuda';
+  const timeoutMs = cfg.timeout_ms || 120000;
+
+  const resolvedAudio = path.resolve(audioPath);
+
+  if (!cliExe || !fs.existsSync(cliExe)) {
+    console.warn(`[ASR] audiocpp_cli not found at '${cliExe}'. Skipping transcription.`);
+    return '';
+  }
+  if (!modelPath || !fs.existsSync(modelPath)) {
+    console.warn(`[ASR] ASR model weights not found at '${modelPath}'. Skipping transcription.`);
+    return '';
+  }
+  if (!fs.existsSync(resolvedAudio)) {
+    console.warn(`[ASR] Audio file not found: ${resolvedAudio}`);
+    return '';
+  }
+
+  // Ensure audio is in WAV PCM format before feeding to audiocpp_cli
+  let inputForCli = resolvedAudio;
+  let tempWav = null;
+  const ext = path.extname(resolvedAudio).toLowerCase();
+  if (ext !== '.wav') {
+    tempWav = path.join(os.tmpdir(), `airi-asr-norm-${process.pid}-${Date.now()}.wav`);
+    try {
+      await normalizeAudioToWav(resolvedAudio, tempWav);
+      inputForCli = tempWav;
+    } catch (normErr) {
+      console.warn(`[ASR Warning] Could not convert ${path.basename(resolvedAudio)} to WAV: ${normErr.message}`);
+    }
+  }
+
   return new Promise((resolve) => {
-    const { resolveEngineBinary } = require('./gpu');
-    const cfg = asrConfig || {};
-    const cliExe = resolveEngineBinary('audiocpp_cli', cfg.cli_exe);
-    const modelPath = resolvePath(cfg.model_path);
-    const family = cfg.family || 'parakeet_tdt';
-    const backend = cfg.backend || 'cuda';
-    const timeoutMs = cfg.timeout_ms || 120000;
-
-    const resolvedAudio = path.resolve(audioPath);
-
-    if (!cliExe || !fs.existsSync(cliExe)) {
-      console.warn(`[ASR] audiocpp_cli not found at '${cliExe}'. Skipping transcription.`);
-      return resolve('');
-    }
-    if (!modelPath || !fs.existsSync(modelPath)) {
-      console.warn(`[ASR] ASR model weights not found at '${modelPath}'. Skipping transcription.`);
-      return resolve('');
-    }
-    if (!fs.existsSync(resolvedAudio)) {
-      console.warn(`[ASR] Audio file not found: ${resolvedAudio}`);
-      return resolve('');
-    }
-
     const outFile = path.join(os.tmpdir(), `airi-asr-${process.pid}-${Date.now()}.txt`);
     console.log(`[ASR] Transcribing ${path.basename(resolvedAudio)} via ${family}...`);
 
@@ -124,7 +150,7 @@ function transcribeAudio(audioPath, asrConfig) {
       '--family', family,
       '--model', modelPath,
       '--backend', backend,
-      '--audio', resolvedAudio,
+      '--audio', inputForCli,
       '--text-out', outFile,
     ], {
       env: {
@@ -142,6 +168,9 @@ function transcribeAudio(audioPath, asrConfig) {
       settled = true;
       clearTimeout(timer);
       try { fs.unlinkSync(outFile); } catch (e) {}
+      if (tempWav) {
+        try { fs.unlinkSync(tempWav); } catch (e) {}
+      }
       resolve(text);
     };
 
@@ -188,4 +217,7 @@ function transcribeAudio(audioPath, asrConfig) {
   });
 }
 
-module.exports = { transcribeAudio };
+module.exports = {
+  transcribeAudio,
+  getCudaPaths
+};

@@ -55,7 +55,7 @@ function createRouter(engine, voiceManager, textProcessor, gpuQueue, config) {
     // model from this list, and AIRI filters it for ids containing whisper/stt/asr/
     // transcription, so a TTS-only catalog leaves its model picker empty.
     if (config.asr && config.asr.model_path) {
-      ids.push(config.asr.model_id || 'parakeet-tdt-asr');
+      ids.push(config.asr.model_id || 'citrinet-asr');
     }
 
     res.json({

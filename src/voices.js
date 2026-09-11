@@ -3,6 +3,8 @@ const path = require('path');
 const { normalizeAudioToWav, ensureOptimalAudioLength } = require('./ffmpeg');
 const { transcribeAudio } = require('./stt');
 
+const PLACEHOLDER = 'Speaker reference sample.';
+
 function resolvePath(relativePath) {
   if (!relativePath) return '';
   if (path.isAbsolute(relativePath)) return relativePath;
@@ -95,16 +97,14 @@ class VoiceManager {
 
     let targetWavPath = path.join(this.voicesDir, `${voiceId}.wav`);
 
-    // ZERO FILE DELETION RULE: Safely archive existing local file if replacing inside local voicesDir
+    // ZERO FILE DELETION RULE: Safely archive existing local file only if replacing with the same extension
     const existingFile = this.getVoiceFile(voiceId);
     const resolvedVoicesDir = path.resolve(this.voicesDir);
     const isLocalReplaceable = existingFile
       && existingFile !== targetWavPath
-      && path.resolve(existingFile).startsWith(resolvedVoicesDir);
-    // The existing local file is often the very file we are ingesting from (e.g. a
-    // bundled voices/name.mp3 being normalized to voices/name.wav). Archiving it up
-    // front moves FFmpeg's input out from under it, so defer that case until after
-    // the normalized WAV has been written.
+      && path.resolve(existingFile).startsWith(resolvedVoicesDir)
+      && path.extname(existingFile).toLowerCase() === path.extname(targetWavPath).toLowerCase();
+
     const existingIsSource = existingFile && path.resolve(existingFile) === path.resolve(inputPath);
 
     if (isLocalReplaceable && !existingIsSource) {
@@ -128,26 +128,35 @@ class VoiceManager {
     let transcript = await transcribeAudio(targetWavPath, this.asrConfig);
 
     // A mismatched reference transcript wrecks zero-shot cloning, so never let a
-    // failed transcription overwrite a transcript that is already known-good.
-    if (!transcript) {
+    // failed transcription overwrite a transcript that is already known-good,
+    // and never inject a dummy placeholder that collapses acoustic cross-attention.
+    if (!transcript || transcript === PLACEHOLDER) {
       const knownTranscript = this.vocabulary[voiceId]?.transcript;
       if (fs.existsSync(sidecarTxt)) {
-        transcript = fs.readFileSync(sidecarTxt, 'utf-8').trim();
-      }
-      else if (knownTranscript) {
+        const sidecarContent = fs.readFileSync(sidecarTxt, 'utf-8').trim();
+        if (sidecarContent && sidecarContent !== PLACEHOLDER) {
+          transcript = sidecarContent;
+        }
+      } else if (knownTranscript && knownTranscript !== PLACEHOLDER) {
         transcript = knownTranscript;
       }
-      if (!transcript) {
-        console.warn(`[Voices] No transcript available for '${voiceId}'. Cloning quality will suffer.`);
-        transcript = 'Speaker reference sample.';
+
+      if (!transcript || transcript === PLACEHOLDER) {
+        const errorMsg = `[Voices Error] No transcript available for voice '${voiceId}' and ASR engine failed or is not installed.\n` +
+          `Zero-shot voice cloning requires an accurate transcript of what is spoken in the reference audio.\n` +
+          `To fix this:\n` +
+          `  1. Run 'install-stt.bat' to automatically download and configure the local Citrinet ASR engine.\n` +
+          `  2. Or create a text file '${sidecarTxt}' containing the exact words spoken in the audio clip.`;
+        console.error(errorMsg);
+        throw new Error(errorMsg);
       }
-    }
-    else {
+    } else {
       fs.writeFileSync(sidecarTxt, transcript, 'utf-8');
     }
 
+    const relFile = path.relative(path.resolve(__dirname, '..'), targetWavPath).replace(/\\/g, '/');
     this.vocabulary[voiceId] = {
-      file: targetWavPath,
+      file: relFile,
       transcript: transcript
     };
     this.saveVocabulary();
@@ -161,14 +170,36 @@ class VoiceManager {
   async resolveVoice(voiceId) {
     if (!voiceId) return null;
 
-    // Check vocabulary first
+    // Check vocabulary first (rejecting any legacy placeholder strings)
     if (this.vocabulary[voiceId] && fs.existsSync(resolvePath(this.vocabulary[voiceId].file))) {
       const vocabFile = resolvePath(this.vocabulary[voiceId].file);
-      if (fs.statSync(vocabFile).size > 0) {
+      const vocabTranscript = this.vocabulary[voiceId].transcript;
+      if (fs.statSync(vocabFile).size > 0 && vocabTranscript && vocabTranscript !== PLACEHOLDER) {
         return {
           file: vocabFile,
-          transcript: this.vocabulary[voiceId].transcript
+          transcript: vocabTranscript
         };
+      }
+    }
+
+    // Check sidecar .txt file if present
+    const sidecarTxt = path.join(this.voicesDir, `${voiceId}.txt`);
+    if (fs.existsSync(sidecarTxt)) {
+      const txt = fs.readFileSync(sidecarTxt, 'utf-8').trim();
+      if (txt && txt !== PLACEHOLDER) {
+        const file = this.getVoiceFile(voiceId);
+        if (file) {
+          const relFile = path.relative(path.resolve(__dirname, '..'), file).replace(/\\/g, '/');
+          this.vocabulary[voiceId] = {
+            file: relFile,
+            transcript: txt
+          };
+          this.saveVocabulary();
+          return {
+            file: file,
+            transcript: txt
+          };
+        }
       }
     }
 

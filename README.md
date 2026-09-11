@@ -37,7 +37,7 @@
 
 ## 🎙️ Official Supported TTS Models & 1-Click Auto-Downloader
 
-AIRI Audio Server natively supports the following 5 core TTS models with **1-click automatic downloading**:
+AIRI Audio Server natively supports the following 6 core TTS models with **1-click automatic downloading**:
 
 | # | Model Name | VRAM | Key Features | HuggingFace GGUF Link |
 | :---: | :--- | :---: | :--- | :--- |
@@ -46,6 +46,7 @@ AIRI Audio Server natively supports the following 5 core TTS models with **1-cli
 | **3** | **Fish Audio S2 Pro Q8_0** | ~6.31 GB | Dual-AR Fast Streaming Synthesis, Zero-Shot Voice Cloning, 1.25 RTF *(See [Q6_K & Q4_K Quant Recipe](docs/FISH_AUDIO_S2_PRO_QUANTIZATION_RECIPE.md) to save up to 1.82 GB VRAM)* | [`audio-cpp-gguf/Fish-Audio-S2-Pro-GGUF`](https://huggingface.co/audio-cpp/audio.cpp-gguf/resolve/main/Fish-Audio-S2-Pro-GGUF/fish-audio-s2-pro-q8_0.gguf) |
 | **4** | **Chatterbox TTS Q8_0** | ~2.10 GB | High-Fidelity Expressive Speech Synthesis | [`audio-cpp-gguf/Chatterbox-GGUF`](https://huggingface.co/audio-cpp/audio.cpp-gguf/resolve/main/Chatterbox-GGUF/chatterbox-q8_0.gguf) |
 | **5** | **MOSS TTS Local v1.5 Q8_0** | ~7.50 GB | Large Scale Multilingual Neural Speech Model | [`audio-cpp-gguf/MOSS-TTS-Local-v1.5-GGUF`](https://huggingface.co/audio-cpp/audio.cpp-gguf/resolve/main/MOSS-TTS-Local-v1.5-GGUF/moss-tts-local-v1.5-q8_0.gguf) |
+| **6** | **Breeze TTS 2 Q8_0** | ~5.08 GB | Instruction-Conditioned Speech Synthesis, Voice Cloning & Design, Real-Time Streaming | [`audio-cpp-gguf/Breeze-TTS-2-GGUF`](https://huggingface.co/audio-cpp/audio.cpp-gguf/resolve/main/Breeze-TTS-2-GGUF/breeze-tts-2-q8_0.gguf) |
 
 ---
 

@@ -56,6 +56,16 @@ const MODEL_CATALOG = [
     features: "Large Scale Multilingual Neural Speech Model",
     relPath: "models/MOSS-TTS-GGUF/moss-tts-local-v1.5-q8_0.gguf",
     downloadUrl: "https://huggingface.co/audio-cpp/audio.cpp-gguf/resolve/main/MOSS-TTS-Local-v1.5-GGUF/moss-tts-local-v1.5-q8_0.gguf"
+  },
+  {
+    num: "6",
+    id: "breeze-tts",
+    name: "Breeze TTS 2 Q8_0",
+    family: "breeze_tts",
+    vram: "~5.08 GB",
+    features: "Instruction-Conditioned Speech Synthesis, Voice Cloning & Design, Real-Time Streaming",
+    relPath: "models/Breeze-TTS-2-GGUF/breeze-tts-2-q8_0.gguf",
+    downloadUrl: "https://huggingface.co/audio-cpp/audio.cpp-gguf/resolve/main/Breeze-TTS-2-GGUF/breeze-tts-2-q8_0.gguf"
   }
 ];
 
@@ -229,7 +239,7 @@ function runSetup() {
       console.log(`      Path: ${fullPath}\n`);
     });
 
-    rl.question("Enter your choice (1-5, default is 1): ", async (answer) => {
+    rl.question("Enter your choice (1-6, default is 1): ", async (answer) => {
       const choice = answer.trim() || "1";
       const selected = MODEL_CATALOG.find(m => m.num === choice) || MODEL_CATALOG[0];
 

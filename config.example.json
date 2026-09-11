@@ -38,6 +38,12 @@
       "path": "../audio.cpp/models/Fish-Audio-S2-Pro-GGUF/fish-audio-s2-pro-q8_0.gguf",
       "mode": "offline",
       "allow_unfiltered_tags": true
+    },
+    "breeze-tts": {
+      "family": "breeze_tts",
+      "path": "../audio.cpp/models/Breeze-TTS-2-GGUF/breeze-tts-2-q8_0.gguf",
+      "mode": "streaming",
+      "allow_unfiltered_tags": true
     }
   }
 }

@@ -24,3 +24,4 @@ run_*.js
 .airi_audio.pid
 server.log
 voices/vocabulary.json
+voices/archive/ 

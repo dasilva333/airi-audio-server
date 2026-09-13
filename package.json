@@ -8,7 +8,8 @@
     "setup": "node setup.js",
     "add-model": "node setup.js",
     "transcribe-voices": "node tools/transcribe-voices.js",
-    "test": "node test.js"
+    "test": "node --test tests/voice_curation.test.js",
+    "test:synthesis": "node test.js"
   },
   "keywords": [
     "airi",

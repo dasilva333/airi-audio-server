@@ -70,8 +70,7 @@ function createRouter(engine, voiceManager, textProcessor, gpuQueue, config) {
   });
 
   // GET Voice Discovery Waterfall (/v1/voices, /v1/audio/voices, /voices)
-  // AIRI's chatterbox provider reads `data.voices`, so the list is wrapped rather
-  // than returned as a bare array.
+  // AIRI reads `data.voices`, so the list is wrapped rather than returned as a bare array.
   const handleListVoices = (req, res) => {
     res.json({ voices: voiceManager.listVoiceObjects() });
   };
@@ -89,6 +88,10 @@ function createRouter(engine, voiceManager, textProcessor, gpuQueue, config) {
         supportsPresets: false,
         supportsExpressionTags: true,
         supportsMannerisms: false,
+        supportsVoiceCloning: true,
+        supportsVoiceUpload: true,
+        supportsReferenceText: true,
+        allowedAudioFormats: ['.wav', '.mp3', '.ogg', '.m4a', '.flac'],
         expressionTags: [
           { category: "emotion", tag: "question-en", description: "OmniVoice: English question intonation" },
           { category: "emotion", tag: "sigh", description: "OmniVoice: Native sigh" },
@@ -109,11 +112,12 @@ function createRouter(engine, voiceManager, textProcessor, gpuQueue, config) {
       if (!req.file) {
         return res.status(400).json({ error: { message: "No audio file uploaded." } });
       }
-      const voiceId = req.body.voice_id || req.body.name || path.basename(req.file.originalname, path.extname(req.file.originalname));
-      const cleanVoiceId = voiceId.toLowerCase().replace(/[^a-z0-9_-]/g, '_');
+      const rawVoiceId = req.body.voice_id || req.body.name || path.basename(req.file.originalname, path.extname(req.file.originalname));
+      const cleanVoiceId = rawVoiceId.toLowerCase().replace(/[^a-z0-9_-]/g, '_');
+      const userProvidedTranscript = req.body.reference_text || req.body.transcript || null;
 
       const result = await gpuQueue.enqueue(async () => {
-        return await voiceManager.ingestVoiceAudio(req.file.path, cleanVoiceId);
+        return await voiceManager.ingestVoiceAudio(req.file.path, cleanVoiceId, userProvidedTranscript);
       });
 
       try { fs.unlinkSync(req.file.path); } catch (e) {}
@@ -122,15 +126,75 @@ function createRouter(engine, voiceManager, textProcessor, gpuQueue, config) {
         status: 'registered',
         voice_id: cleanVoiceId,
         file: result.file,
-        transcript: result.transcript
+        transcript: result.transcript || '',
+        has_transcript: Boolean(result.has_transcript)
       });
     } catch (err) {
       console.error(`[Voice Register Error] ${err.stack || err.message}`);
+      try { if (req.file) fs.unlinkSync(req.file.path); } catch (e) {}
       res.status(500).json({ error: { message: err.message, stack: err.stack } });
     }
   };
   router.post('/v1/voices', upload.single('file'), handleRegisterVoice);
   router.post('/v1/audio/voices', upload.single('file'), handleRegisterVoice);
+
+  // PUT /v1/voices/:voiceId/transcript (Update or curate reference text)
+  router.put('/v1/voices/:voiceId/transcript', async (req, res) => {
+    try {
+      const rawVoiceId = req.params.voiceId;
+      const cleanVoiceId = rawVoiceId.toLowerCase().replace(/[^a-z0-9_-]/g, '_');
+      const transcript = req.body.reference_text ?? req.body.transcript ?? '';
+
+      const updated = voiceManager.updateVoiceTranscript(cleanVoiceId, transcript);
+      res.json(updated);
+    } catch (err) {
+      console.error(`[Voice Transcript Error] ${err.message}`);
+      res.status(400).json({ error: { message: err.message } });
+    }
+  });
+
+  // DELETE /v1/voices/:voiceId (Archive voice and prune vocabulary)
+  router.delete('/v1/voices/:voiceId', async (req, res) => {
+    try {
+      const rawVoiceId = req.params.voiceId;
+      const cleanVoiceId = rawVoiceId.toLowerCase().replace(/[^a-z0-9_-]/g, '_');
+
+      const deleted = voiceManager.deleteVoice(cleanVoiceId);
+      res.json(deleted);
+    } catch (err) {
+      console.error(`[Voice Delete Error] ${err.message}`);
+      res.status(400).json({ error: { message: err.message } });
+    }
+  });
+
+  // GET /v1/voices/:voiceId/audio (Stream reference audio for preview)
+  router.get('/v1/voices/:voiceId/audio', (req, res) => {
+    try {
+      const rawVoiceId = req.params.voiceId;
+      const cleanVoiceId = rawVoiceId.toLowerCase().replace(/[^a-z0-9_-]/g, '_');
+      const file = voiceManager.getVoiceFile(cleanVoiceId);
+
+      if (!file || !fs.existsSync(file)) {
+        return res.status(404).json({ error: { message: `Voice audio not found for '${cleanVoiceId}'` } });
+      }
+
+      const ext = path.extname(file).toLowerCase();
+      const mimeMap = {
+        '.wav': 'audio/wav',
+        '.mp3': 'audio/mpeg',
+        '.ogg': 'audio/ogg',
+        '.m4a': 'audio/mp4',
+        '.flac': 'audio/flac'
+      };
+
+      res.setHeader('Content-Type', mimeMap[ext] || 'audio/wav');
+      const stream = fs.createReadStream(file);
+      stream.pipe(res);
+    } catch (err) {
+      console.error(`[Voice Audio Error] ${err.message}`);
+      res.status(500).json({ error: { message: err.message } });
+    }
+  });
 
   // POST /v1/audio/transcriptions (OpenAI Speech-to-Text Endpoint)
   router.post('/v1/audio/transcriptions', upload.single('file'), async (req, res) => {

@@ -20,3 +20,7 @@ benchmark_*.js
 download_*.js
 test_*.js
 run_*.js
+
+.airi_audio.pid
+server.log
+voices/vocabulary.json

@@ -90,7 +90,7 @@ class VoiceManager {
     return null;
   }
 
-  async ingestVoiceAudio(inputPath, voiceId) {
+  async ingestVoiceAudio(inputPath, voiceId, userProvidedTranscript = null) {
     if (!fs.existsSync(inputPath)) {
       throw new Error(`Voice reference file not found: ${inputPath}`);
     }
@@ -123,35 +123,48 @@ class VoiceManager {
     // Step 2: Auto-concatenation if reference audio is too short (< 1.5s)
     await ensureOptimalAudioLength(targetWavPath);
 
-    // Step 3: Transcribe the reference clip with the local ASR engine
+    // Step 3: Handle transcript (User provided vs ASR)
     const sidecarTxt = path.join(this.voicesDir, `${voiceId}.txt`);
-    let transcript = await transcribeAudio(targetWavPath, this.asrConfig);
+    let transcript = '';
+    let hasTranscript = false;
 
-    // A mismatched reference transcript wrecks zero-shot cloning, so never let a
-    // failed transcription overwrite a transcript that is already known-good,
-    // and never inject a dummy placeholder that collapses acoustic cross-attention.
-    if (!transcript || transcript === PLACEHOLDER) {
-      const knownTranscript = this.vocabulary[voiceId]?.transcript;
-      if (fs.existsSync(sidecarTxt)) {
-        const sidecarContent = fs.readFileSync(sidecarTxt, 'utf-8').trim();
-        if (sidecarContent && sidecarContent !== PLACEHOLDER) {
-          transcript = sidecarContent;
-        }
-      } else if (knownTranscript && knownTranscript !== PLACEHOLDER) {
-        transcript = knownTranscript;
-      }
-
-      if (!transcript || transcript === PLACEHOLDER) {
-        const errorMsg = `[Voices Error] No transcript available for voice '${voiceId}' and ASR engine failed or is not installed.\n` +
-          `Zero-shot voice cloning requires an accurate transcript of what is spoken in the reference audio.\n` +
-          `To fix this:\n` +
-          `  1. Run 'install-stt.bat' to automatically download and configure the local Citrinet ASR engine.\n` +
-          `  2. Or create a text file '${sidecarTxt}' containing the exact words spoken in the audio clip.`;
-        console.error(errorMsg);
-        throw new Error(errorMsg);
-      }
-    } else {
+    if (userProvidedTranscript && typeof userProvidedTranscript === 'string' && userProvidedTranscript.trim().length > 0) {
+      transcript = userProvidedTranscript.trim();
+      hasTranscript = true;
       fs.writeFileSync(sidecarTxt, transcript, 'utf-8');
+      console.log(`[Voices] Ingested user-provided reference transcript for voice '${voiceId}' (${transcript.length} chars).`);
+    } else {
+      // Transcribe reference clip with local ASR engine
+      try {
+        transcript = await transcribeAudio(targetWavPath, this.asrConfig);
+      } catch (asrErr) {
+        console.warn(`[Voices Warning] ASR transcription failed for '${voiceId}': ${asrErr.message}`);
+        transcript = '';
+      }
+
+      if (transcript && transcript !== PLACEHOLDER) {
+        hasTranscript = true;
+        fs.writeFileSync(sidecarTxt, transcript, 'utf-8');
+        console.log(`[Voices] ASR transcription successful for voice '${voiceId}': "${transcript}"`);
+      } else {
+        // Check if there is an existing known transcript
+        const knownTranscript = this.vocabulary[voiceId]?.transcript;
+        if (fs.existsSync(sidecarTxt)) {
+          const sidecarContent = fs.readFileSync(sidecarTxt, 'utf-8').trim();
+          if (sidecarContent && sidecarContent !== PLACEHOLDER) {
+            transcript = sidecarContent;
+            hasTranscript = true;
+          }
+        } else if (knownTranscript && knownTranscript !== PLACEHOLDER) {
+          transcript = knownTranscript;
+          hasTranscript = true;
+        }
+
+        if (!hasTranscript) {
+          console.warn(`[Voices Notice] Voice '${voiceId}' saved without transcript. Local ASR unconfigured or failed. Zero-shot cloning can be improved by adding a transcript.`);
+          transcript = '';
+        }
+      }
     }
 
     const relFile = path.relative(path.resolve(__dirname, '..'), targetWavPath).replace(/\\/g, '/');
@@ -163,7 +176,61 @@ class VoiceManager {
 
     return {
       file: targetWavPath,
-      transcript: transcript
+      transcript: transcript,
+      has_transcript: hasTranscript
+    };
+  }
+
+  updateVoiceTranscript(voiceId, transcript) {
+    if (!voiceId) throw new Error('Missing voiceId');
+    const file = this.getVoiceFile(voiceId);
+    if (!file) throw new Error(`Voice '${voiceId}' not found on disk`);
+
+    const cleanedText = (transcript || '').trim();
+    const sidecarTxt = path.join(this.voicesDir, `${voiceId}.txt`);
+
+    if (cleanedText && cleanedText !== PLACEHOLDER) {
+      fs.writeFileSync(sidecarTxt, cleanedText, 'utf-8');
+    } else if (fs.existsSync(sidecarTxt)) {
+      try { fs.unlinkSync(sidecarTxt); } catch (e) {}
+    }
+
+    const relFile = path.relative(path.resolve(__dirname, '..'), file).replace(/\\/g, '/');
+    this.vocabulary[voiceId] = {
+      file: relFile,
+      transcript: cleanedText
+    };
+    this.saveVocabulary();
+
+    return {
+      status: 'updated',
+      voice_id: voiceId,
+      has_transcript: Boolean(cleanedText && cleanedText !== PLACEHOLDER),
+      transcript: cleanedText
+    };
+  }
+
+  deleteVoice(voiceId) {
+    if (!voiceId) throw new Error('Missing voiceId');
+    const file = this.getVoiceFile(voiceId);
+    if (!file) throw new Error(`Voice '${voiceId}' not found on disk`);
+
+    // Safely archive audio file
+    this.safeArchiveFile(file);
+
+    // Safely archive sidecar txt if present
+    const sidecarTxt = path.join(this.voicesDir, `${voiceId}.txt`);
+    if (fs.existsSync(sidecarTxt)) {
+      this.safeArchiveFile(sidecarTxt);
+    }
+
+    // Remove from vocabulary
+    delete this.vocabulary[voiceId];
+    this.saveVocabulary();
+
+    return {
+      status: 'archived',
+      voice_id: voiceId
     };
   }
 
@@ -233,16 +300,36 @@ class VoiceManager {
 
   listVoiceObjects() {
     const names = this.listVoices();
-    return names.map(name => ({
-      id: name,
-      name: name.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' '),
-      voice_id: name,
-      preview_url: null,
-      languages: [{ code: 'en', title: 'English' }],
-      gender: 'neutral',
-      provider: 'airi',
-      type: 'native'
-    }));
+    return names.map((name) => {
+      let transcript = this.vocabulary[name]?.transcript || '';
+      if (!transcript) {
+        const sidecarTxt = path.join(this.voicesDir, `${name}.txt`);
+        if (fs.existsSync(sidecarTxt)) {
+          transcript = fs.readFileSync(sidecarTxt, 'utf-8').trim();
+        } else if (this.chatterboxDir) {
+          const cbTxt = path.join(this.chatterboxDir, `${name}.txt`);
+          if (fs.existsSync(cbTxt)) {
+            transcript = fs.readFileSync(cbTxt, 'utf-8').trim();
+          }
+        }
+      }
+
+      const hasTranscript = Boolean(transcript && transcript !== PLACEHOLDER);
+      const isNative = this.chatterboxDir && fs.existsSync(path.join(this.chatterboxDir, `${name}.wav`));
+
+      return {
+        id: name,
+        name: name.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' '),
+        voice_id: name,
+        has_transcript: hasTranscript,
+        reference_text: hasTranscript ? transcript : '',
+        preview_url: `/v1/voices/${name}/audio`,
+        languages: [{ code: 'en', title: 'English' }],
+        gender: 'neutral',
+        provider: 'airi',
+        type: isNative ? 'native' : 'cloned'
+      };
+    });
   }
 }
 

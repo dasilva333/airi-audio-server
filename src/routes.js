@@ -107,20 +107,28 @@ function createRouter(engine, voiceManager, textProcessor, gpuQueue, config) {
   router.get('/chatterbox/capabilities', handleCapabilities);
 
   // POST /v1/voices & /v1/audio/voices (Custom Voice Registration Endpoint)
+  // Accepts multipart file upload under 'audio', 'file', or 'voice' field names
+  const voiceUploadMiddleware = upload.fields([
+    { name: 'audio', maxCount: 1 },
+    { name: 'file', maxCount: 1 },
+    { name: 'voice', maxCount: 1 }
+  ]);
+
   const handleRegisterVoice = async (req, res) => {
+    const uploadedFile = (req.files && (req.files['audio']?.[0] || req.files['file']?.[0] || req.files['voice']?.[0])) || req.file;
     try {
-      if (!req.file) {
-        return res.status(400).json({ error: { message: "No audio file uploaded." } });
+      if (!uploadedFile) {
+        return res.status(400).json({ error: { message: "No audio file uploaded. Supported fields: 'audio', 'file', 'voice'." } });
       }
-      const rawVoiceId = req.body.voice_id || req.body.name || path.basename(req.file.originalname, path.extname(req.file.originalname));
+      const rawVoiceId = req.body.voice_id || req.body.name || path.basename(uploadedFile.originalname, path.extname(uploadedFile.originalname));
       const cleanVoiceId = rawVoiceId.toLowerCase().replace(/[^a-z0-9_-]/g, '_');
       const userProvidedTranscript = req.body.reference_text || req.body.transcript || null;
 
       const result = await gpuQueue.enqueue(async () => {
-        return await voiceManager.ingestVoiceAudio(req.file.path, cleanVoiceId, userProvidedTranscript);
+        return await voiceManager.ingestVoiceAudio(uploadedFile.path, cleanVoiceId, userProvidedTranscript);
       });
 
-      try { fs.unlinkSync(req.file.path); } catch (e) {}
+      try { fs.unlinkSync(uploadedFile.path); } catch (e) {}
 
       res.status(201).json({
         status: 'registered',
@@ -131,12 +139,12 @@ function createRouter(engine, voiceManager, textProcessor, gpuQueue, config) {
       });
     } catch (err) {
       console.error(`[Voice Register Error] ${err.stack || err.message}`);
-      try { if (req.file) fs.unlinkSync(req.file.path); } catch (e) {}
+      try { if (uploadedFile) fs.unlinkSync(uploadedFile.path); } catch (e) {}
       res.status(500).json({ error: { message: err.message, stack: err.stack } });
     }
   };
-  router.post('/v1/voices', upload.single('file'), handleRegisterVoice);
-  router.post('/v1/audio/voices', upload.single('file'), handleRegisterVoice);
+  router.post('/v1/voices', voiceUploadMiddleware, handleRegisterVoice);
+  router.post('/v1/audio/voices', voiceUploadMiddleware, handleRegisterVoice);
 
   // PUT /v1/voices/:voiceId/transcript (Update or curate reference text)
   router.put('/v1/voices/:voiceId/transcript', async (req, res) => {

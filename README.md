@@ -35,6 +35,32 @@
 
 ---
 
+---
+
+## 🖥️ AIRI Desktop & Voice Studio Integration
+
+AIRI Audio Server seamlessly integrates as the high-speed local audio backend for **[Project AIRI](https://github.com/moeru-ai/airi)**, providing rich visual voice management, zero-shot cloning dropzones, and interactive synthesis playgrounds directly inside the desktop interface.
+
+<p align="center">
+  <img src="docs/media/voice_catalog_curation.png" alt="AIRI Voice Catalog & Curation Studio" width="100%" />
+  <br>
+  <em><strong>Voice Catalog & Curation Studio:</strong> Automatic discovery of voice presets and cloned voices, ground-truth transcript verification for acoustic alignment, and 1-click voice upload.</em>
+</p>
+
+<p align="center">
+  <img src="docs/media/voice_settings_playground.png" alt="AIRI Voice Playground" width="100%" />
+  <br>
+  <em><strong>Voice Settings & Live Playground:</strong> Real-time neural speech model selection, speed multipliers, and interactive multi-voice / streaming TTS testing.</em>
+</p>
+
+<p align="center">
+  <img src="docs/media/server_spawner_lifecycle.png" alt="Server Lifecycle & Process Spawner" width="100%" />
+  <br>
+  <em><strong>Desktop IPC Lifecycle Spawner:</strong> Automatic sidecar process spawning, remote SSH command hooks, and real-time connectivity status.</em>
+</p>
+
+---
+
 ## 🎙️ Official Supported TTS Models & 1-Click Auto-Downloader
 
 AIRI Audio Server natively supports the following 6 core TTS models with **1-click automatic downloading**:

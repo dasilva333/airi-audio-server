@@ -48,6 +48,7 @@ const UnifiedGpuQueue = require('./queue');
 const TextProcessor = require('./text');
 const AudioCppEngine = require('./engine');
 const VoiceManager = require('./voices');
+const MusicEngine = require('./music');
 const createRouter = require('./routes');
 
 const app = express();
@@ -62,8 +63,9 @@ const gpuQueue = new UnifiedGpuQueue();
 const textProcessor = new TextProcessor(tagsCsvPath);
 const voiceManager = new VoiceManager(voicesDir, vocabularyPath, config.asr);
 const engine = new AudioCppEngine(config);
+const musicEngine = new MusicEngine(config);
 
-const router = createRouter(engine, voiceManager, textProcessor, gpuQueue, config);
+const router = createRouter(engine, voiceManager, textProcessor, gpuQueue, config, musicEngine);
 app.use(router);
 
 // Global health check endpoint
@@ -85,6 +87,8 @@ app.listen(PORT, HOST, () => {
   console.log(`OpenAI Models Endpoint  : http://localhost:${PORT}/v1/models`);
   console.log(`Voice Discovery         : http://localhost:${PORT}/v1/voices`);
   console.log(`Capabilities Manifest   : http://localhost:${PORT}/v1/capabilities`);
+  console.log(`Generative Music Engine : http://localhost:${PORT}/v1/audio/music`);
+  console.log(`ABC Score Music Planner : http://localhost:${PORT}/v1/audio/music/plan`);
   console.log("=".repeat(60));
 });
 

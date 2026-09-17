@@ -43,7 +43,7 @@ function parseWavDuration(buffer) {
   return (buffer.length - 44) / byteRate;
 }
 
-function createRouter(engine, voiceManager, textProcessor, gpuQueue, config) {
+function createRouter(engine, voiceManager, textProcessor, gpuQueue, config, musicEngine = null) {
   const router = express.Router();
 
   // GET /v1/models (OpenAI Specification)
@@ -100,6 +100,23 @@ function createRouter(engine, voiceManager, textProcessor, gpuQueue, config) {
           { category: "emotion", tag: "confirmation-en", description: "OmniVoice: English confirmation" }
         ],
         mannerisms: []
+      },
+      music: {
+        supported: true,
+        models: ['yue-2', 'minimax-music3'],
+        planning: {
+          supported: true,
+          formats: ['abc'],
+          cot_modes: ['full', 'melody', 'off']
+        },
+        adapters: {
+          supports_lora: true,
+          default_lora: 'ar_lora_inst_v3abc'
+        },
+        sample_rates: {
+          'yue-2': 48000,
+          'minimax-music3': 44100
+        }
       }
     });
   };
@@ -378,6 +395,94 @@ function createRouter(engine, voiceManager, textProcessor, gpuQueue, config) {
 
   router.post('/v1/audio/speech', handleSpeech);
   router.post('/audio/speech', handleSpeech);
+
+  // POST /v1/audio/music/plan (Music Room / Sound Studio ABC Planner)
+  router.post('/v1/audio/music/plan', async (req, res) => {
+    try {
+      if (!musicEngine) {
+        return res.status(503).json({ error: { message: "Music engine not initialized." } });
+      }
+
+      const { prompt, lyrics, cot = 'full', abc_max_tokens = 600, lora } = req.body || {};
+      if (!prompt && !lyrics) {
+        return res.status(400).json({ error: { message: "Either 'prompt' or 'lyrics' is required for music planning." } });
+      }
+
+      const result = await gpuQueue.enqueue(async () => {
+        return await musicEngine.planComposition({
+          prompt: prompt || '',
+          lyrics: lyrics || '',
+          cot,
+          abcMaxTokens: abc_max_tokens,
+          lora
+        });
+      });
+
+      return res.status(200).json(result);
+    } catch (err) {
+      console.error(`[Music Plan Error] ${err.stack || err.message}`);
+      return res.status(500).json({ error: { message: err.message } });
+    }
+  });
+
+  // POST /v1/audio/music (Generative Track Synthesis)
+  router.post('/v1/audio/music', async (req, res) => {
+    try {
+      if (!musicEngine) {
+        return res.status(503).json({ error: { message: "Music engine not initialized." } });
+      }
+
+      const {
+        model = 'yue2',
+        prompt = '',
+        lyrics = '',
+        cot = 'full',
+        abc_score = null,
+        duration_seconds = 60,
+        inference_steps = 8,
+        response_format = 'wav',
+        lora = null
+      } = req.body || {};
+
+      if (!prompt && !lyrics && !abc_score) {
+        return res.status(400).json({ error: { message: "Either 'prompt', 'lyrics', or 'abc_score' must be provided." } });
+      }
+
+      const result = await gpuQueue.enqueue(async () => {
+        return await musicEngine.renderMusic({
+          model,
+          prompt,
+          lyrics,
+          cot,
+          abcScore: abc_score,
+          durationSeconds: duration_seconds,
+          inferenceSteps: inference_steps,
+          lora
+        });
+      });
+
+      let finalAudio = result.audio_buffer;
+      let contentType = 'audio/wav';
+
+      if (response_format === 'ogg' || response_format === 'opus') {
+        finalAudio = await convertWavToOgg(finalAudio);
+        contentType = 'audio/ogg';
+      }
+
+      res.setHeader('Content-Type', contentType);
+      res.setHeader('X-Synthesis-Latency-Ms', result.latency_ms.toString());
+      res.setHeader('X-Music-Model', result.model);
+      res.setHeader('X-Sample-Rate', result.sample_rate.toString());
+      if (result.abc_score) {
+        res.setHeader('X-Abc-Score', Buffer.from(result.abc_score).toString('base64'));
+      }
+
+      return res.status(200).send(finalAudio);
+    } catch (err) {
+      console.error(`[Music API Error] ${err.stack || err.message}`);
+      return res.status(500).json({ error: { message: err.message } });
+    }
+  });
 
   return router;
 }

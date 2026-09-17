@@ -153,11 +153,17 @@ npm run setup
 ```
 *(or `npm run add-model`)*
 
+### Install Generative Music Models (YuE 2 / MiniMax)
+```cmd
+npm run add-music
+```
+*(1-click downloader for YuE 2 3B Q4_0 GGUF, VAE, and AR LoRA cartridges)*
+
 ### Batch Transcribe Reference Voices
 ```cmd
 npm run transcribe-voices
 ```
-*(Rebuilds accurate reference transcripts for all clips in `voices/` via Parakeet TDT ASR)*
+*(Rebuilds accurate reference transcripts for all clips in `voices/` via Citrinet ASR)*
 
 ---
 
@@ -168,9 +174,11 @@ npm run transcribe-voices
 | `/health` | GET | Server health check probe. |
 | `/v1/models` | GET | List installed TTS & ASR models (OpenAI compatible). |
 | `/v1/voices` | GET | Discovered voice presets & custom cloned voices (`{ voices: [...] }`). |
-| `/v1/capabilities` | GET | Supported paralinguistic expression tags manifest. |
+| `/v1/capabilities` | GET | Capabilities manifest (TTS expression tags, Music planning & LoRA features). |
 | `/v1/audio/speech` | POST | Synthesize speech. Supports standard binary (OGG/WAV) or SSE streaming (`stream_format: "sse"`). |
-| `/v1/audio/transcriptions` | POST | Transcribe audio files via native GPU Parakeet TDT ASR. |
+| `/v1/audio/transcriptions` | POST | Transcribe audio files via native GPU Citrinet ASR. |
+| `/v1/audio/music` | POST | Synthesize full generative tracks via YuE 2 (48kHz stereo) or MiniMax Music 3. |
+| `/v1/audio/music/plan` | POST | Fast symbolic ABC score planning (3-20s) for AIRI's Sound Studio / Music Room. |
 
 ---
 

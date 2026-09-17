@@ -46,6 +46,24 @@ if exist "..\audio.cpp" (
 )
 echo:
 
-echo [5/5] Launching Interactive Setup Wizard (Provisions Citrinet ASR and TTS Models)...
+echo [5/6] Launching Interactive Setup Wizard (Provisions Citrinet ASR and TTS Models)...
 node setup.js
+echo:
+
+echo ============================================================
+echo [6/6] Generative Music Engine Add-on (Optional)
+echo ============================================================
+echo Would you like to install Generative Music Models (YuE 2 / MiniMax)?
+echo You can also run 'npm run add-music' at any time later.
+echo:
+set /p INSTALL_MUSIC="Install Generative Music Models now? (y/N): "
+if /i "%INSTALL_MUSIC%"=="y" (
+    node download_music.js
+)
+
+echo:
+echo ============================================================
+echo      AIRI Audio Server Installation Complete!               
+echo ============================================================
+echo Run 'npm start' or 'run_server.bat' to launch the microservice.
 pause

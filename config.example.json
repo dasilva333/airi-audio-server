@@ -44,6 +44,12 @@
       "path": "../audio.cpp/models/Breeze-TTS-2-GGUF/breeze-tts-2-q8_0.gguf",
       "mode": "streaming",
       "allow_unfiltered_tags": true
+    },
+    "yue-2": {
+      "family": "yue2",
+      "path": "../audio.cpp/models/Yue2-3B-GGUF",
+      "mode": "offline",
+      "allow_unfiltered_tags": false
     }
   }
 }

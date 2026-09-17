@@ -66,6 +66,16 @@ const MODEL_CATALOG = [
     features: "Instruction-Conditioned Speech Synthesis, Voice Cloning & Design, Real-Time Streaming",
     relPath: "models/Breeze-TTS-2-GGUF/breeze-tts-2-q8_0.gguf",
     downloadUrl: "https://huggingface.co/audio-cpp/audio.cpp-gguf/resolve/main/Breeze-TTS-2-GGUF/breeze-tts-2-q8_0.gguf"
+  },
+  {
+    num: "7",
+    id: "yue-2",
+    name: "YuE 2 3B Q4_0 (Generative Music Engine)",
+    family: "yue2",
+    vram: "~2.80 GB",
+    features: "ABC Score Planning CoT, 48kHz Stereo Acoustic Diffusion, Plug-and-Play AR LoRAs",
+    relPath: "models/Yue2-3B-GGUF/yue2-3b-q4_0.gguf",
+    downloadUrl: "https://huggingface.co/audio-cpp/audio.cpp-gguf/resolve/main/Yue2-3B-GGUF/yue2-3b-q4_0.gguf"
   }
 ];
 
@@ -232,7 +242,7 @@ function runSetup() {
       console.log(`      Path: ${fullPath}\n`);
     });
 
-    rl.question("Enter your choice (1-6, default is 1): ", async (answer) => {
+    rl.question("Enter your choice (1-7, default is 1): ", async (answer) => {
       const choice = answer.trim() || "1";
       const selected = MODEL_CATALOG.find(m => m.num === choice) || MODEL_CATALOG[0];
 

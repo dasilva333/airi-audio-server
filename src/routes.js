@@ -432,17 +432,16 @@ function createRouter(engine, voiceManager, textProcessor, gpuQueue, config, mus
         return res.status(503).json({ error: { message: "Music engine not initialized." } });
       }
 
-      const {
-        model = 'yue2',
-        prompt = '',
-        lyrics = '',
-        cot = 'full',
-        abc_score = null,
-        duration_seconds = 60,
-        inference_steps = 8,
-        response_format = 'wav',
-        lora = null
-      } = req.body || {};
+      const body = req.body || {};
+      const model = body.model || 'yue2';
+      const prompt = body.prompt || body.style || body.input || '';
+      const lyrics = body.lyrics || body.text || '';
+      const cot = body.cot || 'full';
+      const abc_score = body.abc_score || body.abc || null;
+      const duration_seconds = body.duration_seconds || body.duration || 60;
+      const inference_steps = body.inference_steps || body.steps || 8;
+      const response_format = body.response_format || 'wav';
+      const lora = body.lora || null;
 
       if (!prompt && !lyrics && !abc_score) {
         return res.status(400).json({ error: { message: "Either 'prompt', 'lyrics', or 'abc_score' must be provided." } });

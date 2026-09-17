@@ -123,13 +123,16 @@ class MusicEngine {
     const tempOutDir = fs.mkdtempSync(path.join(os.tmpdir(), 'airi-music-plan-'));
     const dummyWav = path.join(tempOutDir, 'plan_dummy.wav');
 
+    const effectiveStyle = prompt.trim() || 'melodic instrumental, 120 bpm';
+    const effectiveLyrics = lyrics.trim() || '[intro]\n(Instrumental)';
+
     const cliArgs = [
       '--task', 'gen',
       '--family', 'yue2',
       '--model', modelDir,
       '--session-option', 'yue2.model_gguf=yue2-3b-q4_0.gguf',
-      '--request-option', `style=${prompt}`,
-      '--request-option', `lyrics=${lyrics}`,
+      '--request-option', `style=${effectiveStyle}`,
+      '--request-option', `lyrics=${effectiveLyrics}`,
       '--request-option', `cot=${cot}`,
       '--request-option', `abc_max_tokens=${abcMaxTokens}`,
       '--request-option', 'semantic_max_tokens=1',
@@ -227,12 +230,15 @@ class MusicEngine {
 
     const approxTokens = Math.min(3000, Math.max(100, Math.round(durationSeconds * 25)));
 
+    const effectiveStyle = prompt.trim() || 'melodic instrumental, 120 bpm';
+    const effectiveLyrics = lyrics.trim() || '[intro]\n(Instrumental)';
+
     const cliArgs = [
       '--task', 'gen',
       '--family', family,
       '--model', modelDir,
-      '--request-option', `style=${prompt}`,
-      '--request-option', `lyrics=${lyrics}`,
+      '--request-option', `style=${effectiveStyle}`,
+      '--request-option', `lyrics=${effectiveLyrics}`,
       '--request-option', `semantic_max_tokens=${approxTokens}`,
       '--request-option', `num_inference_steps=${inferenceSteps}`,
       '--out-dir', tempDir,

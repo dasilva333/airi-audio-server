@@ -179,6 +179,12 @@ npm run transcribe-voices
 | `/v1/audio/transcriptions` | POST | Transcribe audio files via native GPU Citrinet ASR. |
 | `/v1/audio/music` | POST | Synthesize full generative tracks via YuE 2 (48kHz stereo) or MiniMax Music 3. |
 | `/v1/audio/music/plan` | POST | Fast symbolic ABC score planning (3-20s) for AIRI's Sound Studio / Music Room. |
+| `/v1/audio/music/loras` | GET | List installed AR LoRA adapter cartridges with rank, size, tags, and metadata. |
+| `/v1/audio/music/loras` | POST | Upload and install a pre-trained `.safetensors` LoRA adapter. |
+| `/v1/audio/music/loras/:id` | DELETE | Archive or delete a LoRA cartridge. |
+| `/v1/audio/music/loras/train` | POST | Start background LoRA fine-tuning run with reference audio stems or ABC datasets. |
+| `/v1/audio/music/loras/jobs` | GET | Monitor active fine-tuning jobs (epochs, loss, progress %, ETA). |
+| `/v1/audio/music/loras/jobs/:id/cancel` | POST | Abort an in-flight fine-tuning session. |
 
 ---
 

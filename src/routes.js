@@ -484,6 +484,113 @@ function createRouter(engine, voiceManager, textProcessor, gpuQueue, config, mus
     }
   });
 
+  // GET /v1/audio/music/loras (Discover installed LoRA cartridges)
+  router.get('/v1/audio/music/loras', (req, res) => {
+    try {
+      if (!musicEngine) {
+        return res.status(503).json({ error: { message: "Music engine not initialized." } });
+      }
+      const loras = musicEngine.listLoras();
+      return res.json({ object: 'list', data: loras });
+    } catch (err) {
+      return res.status(500).json({ error: { message: err.message } });
+    }
+  });
+
+  // POST /v1/audio/music/loras (Upload pre-trained LoRA adapter)
+  router.post('/v1/audio/music/loras', upload.single('file'), (req, res) => {
+    try {
+      if (!musicEngine) {
+        return res.status(503).json({ error: { message: "Music engine not initialized." } });
+      }
+      if (!req.file) {
+        return res.status(400).json({ error: { message: "No LoRA file uploaded. Supported field: 'file'." } });
+      }
+
+      const lorasDir = musicEngine.getLorasDir();
+      const rawId = req.body.id || path.basename(req.file.originalname, path.extname(req.file.originalname));
+      const cleanId = rawId.toLowerCase().replace(/[^a-z0-9_-]/g, '_');
+      const targetPath = path.join(lorasDir, `${cleanId}.safetensors`);
+
+      fs.renameSync(req.file.path, targetPath);
+
+      const metadata = {
+        name: req.body.name || cleanId.replace(/[-_]/g, ' '),
+        family: req.body.family || 'yue2',
+        stage: req.body.stage || 'ar',
+        rank: parseInt(req.body.rank || '32', 10),
+        alpha: parseFloat(req.body.alpha || '32.0'),
+        tags: req.body.tags ? req.body.tags.split(',').map(t => t.trim()) : ['instrumental', 'custom_uploaded'],
+        compatible_models: [req.body.target_model || 'yue-2']
+      };
+
+      fs.writeFileSync(path.join(lorasDir, `${cleanId}.json`), JSON.stringify(metadata, null, 2), 'utf8');
+
+      return res.status(201).json({
+        status: 'installed',
+        lora_id: cleanId,
+        metadata
+      });
+    } catch (err) {
+      return res.status(500).json({ error: { message: err.message } });
+    }
+  });
+
+  // DELETE /v1/audio/music/loras/:id (Archive or delete LoRA cartridge)
+  router.delete('/v1/audio/music/loras/:id', (req, res) => {
+    try {
+      if (!musicEngine) {
+        return res.status(503).json({ error: { message: "Music engine not initialized." } });
+      }
+      const loraId = req.params.id;
+      const result = musicEngine.deleteLora(loraId);
+      return res.json(result);
+    } catch (err) {
+      return res.status(500).json({ error: { message: err.message } });
+    }
+  });
+
+  // POST /v1/audio/music/loras/train (Trigger background LoRA style/voice fine-tuning run)
+  router.post('/v1/audio/music/loras/train', (req, res) => {
+    try {
+      if (!musicEngine) {
+        return res.status(503).json({ error: { message: "Music engine not initialized." } });
+      }
+      const params = req.body || {};
+      const job = musicEngine.startTrainingJob(params);
+      return res.status(202).json(job);
+    } catch (err) {
+      return res.status(500).json({ error: { message: err.message } });
+    }
+  });
+
+  // GET /v1/audio/music/loras/jobs (Monitor active training jobs and telemetry)
+  router.get('/v1/audio/music/loras/jobs', (req, res) => {
+    try {
+      if (!musicEngine) {
+        return res.status(503).json({ error: { message: "Music engine not initialized." } });
+      }
+      const jobs = musicEngine.getTrainingJobs();
+      return res.json({ object: 'list', data: jobs });
+    } catch (err) {
+      return res.status(500).json({ error: { message: err.message } });
+    }
+  });
+
+  // POST /v1/audio/music/loras/jobs/:id/cancel (Abort an in-flight training session)
+  router.post('/v1/audio/music/loras/jobs/:id/cancel', (req, res) => {
+    try {
+      if (!musicEngine) {
+        return res.status(503).json({ error: { message: "Music engine not initialized." } });
+      }
+      const jobId = req.params.id;
+      const job = musicEngine.cancelTrainingJob(jobId);
+      return res.json({ status: 'cancelled', job });
+    } catch (err) {
+      return res.status(500).json({ error: { message: err.message } });
+    }
+  });
+
   return router;
 }
 

@@ -89,6 +89,7 @@ app.listen(PORT, HOST, () => {
   console.log(`Capabilities Manifest   : http://localhost:${PORT}/v1/capabilities`);
   console.log(`Generative Music Engine : http://localhost:${PORT}/v1/audio/music`);
   console.log(`ABC Score Music Planner : http://localhost:${PORT}/v1/audio/music/plan`);
+  console.log(`LoRA Cartridge Manager  : http://localhost:${PORT}/v1/audio/music/loras`);
   console.log("=".repeat(60));
 });
 

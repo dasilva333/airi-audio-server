@@ -135,6 +135,7 @@ class MusicEngine {
       '--request-option', `lyrics=${effectiveLyrics}`,
       '--request-option', `cot=${cot}`,
       '--request-option', `abc_max_tokens=${abcMaxTokens}`,
+      '--request-option', 'semantic_min_tokens=0',
       '--request-option', 'semantic_max_tokens=1',
       '--request-option', 'num_inference_steps=1',
       '--out-dir', tempOutDir,
@@ -228,7 +229,8 @@ class MusicEngine {
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'airi-music-render-'));
     const outputWav = path.join(tempDir, `music_output_${Date.now()}.wav`);
 
-    const approxTokens = Math.min(3000, Math.max(100, Math.round(durationSeconds * 25)));
+    const approxTokens = Math.min(3000, Math.max(200, Math.round(durationSeconds * 25)));
+    const minTokens = Math.min(approxTokens, Math.max(100, Math.round(approxTokens * 0.9)));
 
     const effectiveStyle = prompt.trim() || 'melodic instrumental, 120 bpm';
     const effectiveLyrics = lyrics.trim() || '[intro]\n(Instrumental)';
@@ -239,6 +241,7 @@ class MusicEngine {
       '--model', modelDir,
       '--request-option', `style=${effectiveStyle}`,
       '--request-option', `lyrics=${effectiveLyrics}`,
+      '--request-option', `semantic_min_tokens=${minTokens}`,
       '--request-option', `semantic_max_tokens=${approxTokens}`,
       '--request-option', `num_inference_steps=${inferenceSteps}`,
       '--out-dir', tempDir,

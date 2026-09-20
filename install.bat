@@ -46,12 +46,12 @@ if exist "..\audio.cpp" (
 )
 echo:
 
-echo [5/6] Launching Interactive Setup Wizard (Provisions Citrinet ASR and TTS Models)...
+echo [5/8] Launching Interactive Setup Wizard (Provisions Citrinet ASR and TTS Models)...
 node setup.js
 echo:
 
 echo ============================================================
-echo [6/6] Generative Music Engine Add-on (Optional)
+echo [6/8] Generative Music Engine Add-on (Optional)
 echo ============================================================
 echo Would you like to install Generative Music Models (YuE 2 / MiniMax)?
 echo You can also run 'npm run add-music' at any time later.
@@ -59,6 +59,32 @@ echo:
 set /p INSTALL_MUSIC="Install Generative Music Models now? (y/N): "
 if /i "%INSTALL_MUSIC%"=="y" (
     node download_music.js
+)
+echo:
+
+echo ============================================================
+echo [7/8] Natural Voice Designer Add-on (Optional)
+echo ============================================================
+echo Would you like to install MOSS-VoiceGenerator for creating voices
+echo from natural text descriptions without audio samples?
+echo You can also run 'npm run add-voicegen' at any time later.
+echo:
+set /p INSTALL_VOICEGEN="Install MOSS-VoiceGenerator now? (y/N): "
+if /i "%INSTALL_VOICEGEN%"=="y" (
+    node download_voicegen.js
+)
+echo:
+
+echo ============================================================
+echo [8/8] Fast Sound Effects / SFX Add-on (Optional)
+echo ============================================================
+echo Would you like to install Stable Audio 3 Small SFX for ambient
+echo textures, sound effects, and UI foley (8 diffusion steps)?
+echo You can also run 'npm run add-sfx' at any time later.
+echo:
+set /p INSTALL_SFX="Install Stable Audio 3 Small SFX now? (y/N): "
+if /i "%INSTALL_SFX%"=="y" (
+    node download_sfx.js
 )
 
 echo:

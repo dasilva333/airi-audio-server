@@ -49,6 +49,8 @@ const TextProcessor = require('./text');
 const AudioCppEngine = require('./engine');
 const VoiceManager = require('./voices');
 const MusicEngine = require('./music');
+const VoiceDesignerEngine = require('./voice_design');
+const SfxEngine = require('./sfx');
 const createRouter = require('./routes');
 
 const app = express();
@@ -64,8 +66,10 @@ const textProcessor = new TextProcessor(tagsCsvPath);
 const voiceManager = new VoiceManager(voicesDir, vocabularyPath, config.asr);
 const engine = new AudioCppEngine(config);
 const musicEngine = new MusicEngine(config);
+const voiceDesigner = new VoiceDesignerEngine(config, voiceManager);
+const sfxEngine = new SfxEngine(config);
 
-const router = createRouter(engine, voiceManager, textProcessor, gpuQueue, config, musicEngine);
+const router = createRouter(engine, voiceManager, textProcessor, gpuQueue, config, musicEngine, voiceDesigner, sfxEngine);
 app.use(router);
 
 // Global health check endpoint
@@ -73,7 +77,9 @@ app.get('/health', (req, res) => {
   res.json({
     status: 'ok',
     engine_ready: engine.isReady,
-    active_model: engine.activeModel || engine.getDefaultModelId()
+    active_model: engine.activeModel || engine.getDefaultModelId(),
+    voice_designer_ready: voiceDesigner.isAvailable(),
+    sfx_engine_ready: sfxEngine.isAvailable()
   });
 });
 
@@ -90,6 +96,8 @@ app.listen(PORT, HOST, () => {
   console.log(`Generative Music Engine : http://localhost:${PORT}/v1/audio/music`);
   console.log(`ABC Score Music Planner : http://localhost:${PORT}/v1/audio/music/plan`);
   console.log(`LoRA Cartridge Manager  : http://localhost:${PORT}/v1/audio/music/loras`);
+  console.log(`Voice Designer Endpoint : http://localhost:${PORT}/v1/audio/voice-design`);
+  console.log(`Sound Effects (SFX)     : http://localhost:${PORT}/v1/audio/sfx`);
   console.log("=".repeat(60));
 });
 

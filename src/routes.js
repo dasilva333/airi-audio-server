@@ -43,7 +43,7 @@ function parseWavDuration(buffer) {
   return (buffer.length - 44) / byteRate;
 }
 
-function createRouter(engine, voiceManager, textProcessor, gpuQueue, config, musicEngine = null) {
+function createRouter(engine, voiceManager, textProcessor, gpuQueue, config, musicEngine = null, voiceDesigner = null, sfxEngine = null) {
   const router = express.Router();
 
   // GET /v1/models (OpenAI Specification)
@@ -100,6 +100,28 @@ function createRouter(engine, voiceManager, textProcessor, gpuQueue, config, mus
           { category: "emotion", tag: "confirmation-en", description: "OmniVoice: English confirmation" }
         ],
         mannerisms: []
+      },
+      voice_design: {
+        supported: true,
+        model: 'moss-voicegen',
+        family: 'moss_voicegen',
+        languages: ['English', 'Chinese'],
+        sample_rate: 24000,
+        supports_auto_ingest: true,
+        default_params: {
+          audio_temperature: 1.5,
+          audio_top_p: 0.6,
+          audio_top_k: 50,
+          audio_repetition_penalty: 1.1
+        }
+      },
+      sfx: {
+        supported: true,
+        model: 'stable-audio-3-small-sfx',
+        family: 'stable_audio',
+        sample_rate: 44100,
+        default_duration_seconds: 6,
+        default_inference_steps: 8
       },
       music: {
         supported: true,
@@ -586,6 +608,134 @@ function createRouter(engine, voiceManager, textProcessor, gpuQueue, config, mus
       const job = musicEngine.cancelTrainingJob(jobId);
       return res.json({ status: 'cancelled', job });
     } catch (err) {
+      return res.status(500).json({ error: { message: err.message } });
+    }
+  });
+
+  // POST /v1/audio/voice-design (Natural Language Voice Persona Designer via MOSS-VoiceGenerator)
+  router.post('/v1/audio/voice-design', async (req, res) => {
+    try {
+      if (!voiceDesigner) {
+        return res.status(503).json({ error: { message: "Voice design engine not initialized." } });
+      }
+
+      const {
+        instruct,
+        description,
+        prompt,
+        text,
+        language = 'English',
+        save_as_voice = null,
+        seed = null,
+        response_format = 'wav',
+        audio_temperature = 1.5,
+        audio_top_p = 0.6,
+        audio_top_k = 50,
+        audio_repetition_penalty = 1.1
+      } = req.body || {};
+
+      const effectiveInstruct = (instruct || description || prompt || '').trim();
+      if (!effectiveInstruct) {
+        return res.status(400).json({
+          error: { message: "Missing required 'instruct' field describing the voice persona (e.g. 'A warm male radio voice in his fifties, calm, never shrill.')." }
+        });
+      }
+
+      const effectiveText = (text || 'Hello, this is a demonstration of my newly designed voice persona.').trim();
+
+      const result = await gpuQueue.enqueue(async () => {
+        return await voiceDesigner.generateVoice({
+          instruct: effectiveInstruct,
+          text: effectiveText,
+          language,
+          save_as_voice,
+          seed,
+          audio_temperature,
+          audio_top_p,
+          audio_top_k,
+          audio_repetition_penalty
+        });
+      });
+
+      let finalAudio = result.audio_buffer;
+      let contentType = 'audio/wav';
+
+      if (response_format === 'ogg' || response_format === 'opus') {
+        finalAudio = await convertWavToOgg(finalAudio);
+        contentType = 'audio/ogg';
+      }
+
+      res.setHeader('Content-Type', contentType);
+      res.setHeader('X-Synthesis-Latency-Ms', result.latency_ms.toString());
+      res.setHeader('X-Sample-Rate', result.sample_rate.toString());
+      res.setHeader('X-Voice-Model', 'moss-voicegen');
+      if (result.saved_voice && result.saved_voice.file) {
+        res.setHeader('X-Saved-Voice-Id', save_as_voice.toLowerCase().replace(/[^a-z0-9_-]/g, '_'));
+      }
+
+      return res.status(200).send(finalAudio);
+    } catch (err) {
+      console.error(`[Voice Design API Error] ${err.stack || err.message}`);
+      return res.status(500).json({ error: { message: err.message } });
+    }
+  });
+
+  // POST /v1/audio/sfx (Sound Effects & Foley Generation via Stable Audio 3 Small SFX)
+  router.post('/v1/audio/sfx', async (req, res) => {
+    try {
+      if (!sfxEngine) {
+        return res.status(503).json({ error: { message: "SFX engine not initialized." } });
+      }
+
+      const {
+        prompt,
+        text,
+        duration_seconds = 6,
+        inference_steps = 8,
+        num_inference_steps = null,
+        guidance_scale = 1.0,
+        seed = null,
+        negative_prompt = '',
+        response_format = 'wav'
+      } = req.body || {};
+
+      const effectivePrompt = (prompt || text || '').trim();
+      if (!effectivePrompt) {
+        return res.status(400).json({
+          error: { message: "Missing required 'prompt' or 'text' field describing the sound effect (e.g. 'laser cannon shot, sci-fi reverb')." }
+        });
+      }
+
+      const steps = num_inference_steps || inference_steps || 8;
+
+      const result = await gpuQueue.enqueue(async () => {
+        return await sfxEngine.generateSfx({
+          prompt: effectivePrompt,
+          duration_seconds,
+          num_inference_steps: steps,
+          guidance_scale,
+          seed,
+          negative_prompt
+        });
+      });
+
+      let finalAudio = result.audio_buffer;
+      let contentType = 'audio/wav';
+
+      if (response_format === 'ogg' || response_format === 'opus') {
+        finalAudio = await convertWavToOgg(finalAudio);
+        contentType = 'audio/ogg';
+      }
+
+      res.setHeader('Content-Type', contentType);
+      res.setHeader('X-Synthesis-Latency-Ms', result.latency_ms.toString());
+      res.setHeader('X-Sample-Rate', result.sample_rate.toString());
+      res.setHeader('X-Sfx-Model', 'stable-audio-3-small-sfx');
+      res.setHeader('X-Audio-Duration-Sec', result.duration_seconds.toString());
+
+      return res.status(200).send(finalAudio);
+    } catch (err) {
+      console.error(`[SFX API Error] ${err.stack || err.message}`);
       return res.status(500).json({ error: { message: err.message } });
     }
   });

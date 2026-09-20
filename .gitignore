@@ -18,6 +18,9 @@ models/
 shootout.js
 benchmark_*.js
 download_*.js
+!download_music.js
+!download_voicegen.js
+!download_sfx.js
 test_*.js
 run_*.js
 

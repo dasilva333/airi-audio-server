@@ -50,6 +50,18 @@
       "path": "../audio.cpp/models/Yue2-3B-GGUF",
       "mode": "offline",
       "allow_unfiltered_tags": false
+    },
+    "moss-voicegen": {
+      "family": "moss_voicegen",
+      "path": "../audio.cpp/models/MOSS-VoiceGenerator-GGUF",
+      "mode": "offline",
+      "task": "vdes"
+    },
+    "stable-audio-3-small-sfx": {
+      "family": "stable_audio",
+      "path": "../audio.cpp/models/Stable-Audio-3-Small-SFX-GGUF",
+      "mode": "offline",
+      "task": "gen"
     }
   }
 }

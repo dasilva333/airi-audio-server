@@ -8,6 +8,8 @@
     "setup": "node setup.js",
     "add-model": "node setup.js",
     "add-music": "node download_music.js",
+    "add-voicegen": "node download_voicegen.js",
+    "add-sfx": "node download_sfx.js",
     "transcribe-voices": "node tools/transcribe-voices.js",
     "test": "node --test tests/voice_curation.test.js",
     "test:synthesis": "node test.js"

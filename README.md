@@ -159,6 +159,18 @@ npm run add-music
 ```
 *(1-click downloader for YuE 2 3B Q4_0 GGUF, VAE, and AR LoRA cartridges)*
 
+### Install Natural Voice Designer (MOSS-VoiceGenerator)
+```cmd
+npm run add-voicegen
+```
+*(1-click downloader for MOSS-VoiceGenerator GGUF to create voices directly from natural descriptions)*
+
+### Install Sound Effects / SFX Engine (Stable Audio 3 Small SFX)
+```cmd
+npm run add-sfx
+```
+*(1-click downloader for Stable Audio 3 Small SFX GGUF for rapid 8-step sound effects & foley generation)*
+
 ### Batch Transcribe Reference Voices
 ```cmd
 npm run transcribe-voices
@@ -171,12 +183,14 @@ npm run transcribe-voices
 
 | Endpoint | Method | Description |
 | :--- | :--- | :--- |
-| `/health` | GET | Server health check probe. |
+| `/health` | GET | Server health check probe (reports TTS, Voice Designer, and SFX engine readiness). |
 | `/v1/models` | GET | List installed TTS & ASR models (OpenAI compatible). |
 | `/v1/voices` | GET | Discovered voice presets & custom cloned voices (`{ voices: [...] }`). |
-| `/v1/capabilities` | GET | Capabilities manifest (TTS expression tags, Music planning & LoRA features). |
+| `/v1/capabilities` | GET | Capabilities manifest (TTS expression tags, Voice Design, SFX, and Music planning). |
 | `/v1/audio/speech` | POST | Synthesize speech. Supports standard binary (OGG/WAV) or SSE streaming (`stream_format: "sse"`). |
 | `/v1/audio/transcriptions` | POST | Transcribe audio files via native GPU Citrinet ASR. |
+| `/v1/audio/voice-design` | POST | Synthesize custom voice personas directly from text descriptions (`instruct`, `text`, `save_as_voice`) via MOSS-VoiceGenerator. |
+| `/v1/audio/sfx` | POST | Synthesize sound effects and foley (`prompt`, `duration_seconds`, `inference_steps`) via Stable Audio 3 Small SFX. |
 | `/v1/audio/music` | POST | Synthesize full generative tracks via YuE 2 (48kHz stereo) or MiniMax Music 3. |
 | `/v1/audio/music/plan` | POST | Fast symbolic ABC score planning (3-20s) for AIRI's Sound Studio / Music Room. |
 | `/v1/audio/music/loras` | GET | List installed AR LoRA adapter cartridges with rank, size, tags, and metadata. |

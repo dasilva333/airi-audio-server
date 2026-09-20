@@ -202,5 +202,25 @@ npm run transcribe-voices
 
 ---
 
+## 🔬 Production Insights & Benchmarks (Theory vs. Practice)
+
+Field verification on an NVIDIA GeForce RTX 4070 Laptop GPU (8GB VRAM) revealed several important practical considerations:
+
+1. **Stable Audio 3 Small SFX (`POST /v1/audio/sfx`)**:
+   - **Theoretical Expectations**: Fast diffusion, low footprint.
+   - **Empirical Reality**: Generates a 3.0s stereo sound effect in **10.59s** (8 rectified flow steps). Memory consumption sits at **~1.6 GB VRAM**, making it fully safe to run concurrently or sequentially without triggering CUDA out-of-memory errors on 8GB GPUs.
+   - **Acoustics**: Native 44.1 kHz stereo audio with true stereo imaging and reverb tail.
+
+2. **MOSS-VoiceGenerator (`POST /v1/audio/voice-design`)**:
+   - **Theoretical Expectations**: Generates speech from instructions; decoding parameters require delicate tuning.
+   - **Empirical Reality**: Generates a 5.84s utterance in **40.55s** (~6.9x RTF). Consumes **~3.8 GB VRAM**.
+   - **Sampling Sensitivity**: Must use the curated decoding defaults (`audio_temperature=1.5`, `audio_top_p=0.6`, `audio_top_k=50`, `audio_repetition_penalty=1.1`). Generic TTS sampling presets cause the model to prematurely terminate on the first frame.
+   - **Auto-Ingestion Pipeline**: Specifying `save_as_voice: "voice_id"` in the POST body normalizes the output to 24kHz mono PCM WAV, saves it into `voices/<voice_id>.wav`, writes the ground-truth text sidecar (`voices/<voice_id>.txt`), and automatically advertises the new voice to `GET /v1/voices` for instantaneous zero-shot voice cloning with OmniVoice, Higgs Audio, or Fish Audio!
+
+3. **Unified Serialization (`src/queue.js`)**:
+   - Both Voice Design and SFX commands are dispatched through the server's serialized FIFO GPU queue. This prevents VRAM thrashing when synthesis requests arrive while TTS or music generation is in progress.
+
+---
+
 ## 📄 License
 MIT License. Developed for AIRI.

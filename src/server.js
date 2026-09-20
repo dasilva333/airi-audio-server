@@ -4,7 +4,7 @@ const { spawnSync } = require('child_process');
 const express = require('express');
 const cors = require('cors');
 
-const configPath = path.join(__dirname, '../config.json');
+const configPath = process.env.AIRI_CONFIG ? path.resolve(process.env.AIRI_CONFIG) : path.join(__dirname, '../config.json');
 const exampleConfigPath = path.join(__dirname, '../config.example.json');
 
 function loadOrCreateConfig() {

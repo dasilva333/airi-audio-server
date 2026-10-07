@@ -257,7 +257,7 @@ function createRouter(engine, voiceManager, textProcessor, gpuQueue, config, mus
       try {
         await normalizeAudioToWav(req.file.path, normalizedPath);
         transcript = await gpuQueue.enqueue(async () => {
-          return await transcribeAudio(normalizedPath, config.asr);
+          return await transcribeAudio(normalizedPath, config.asr, config);
         });
       } finally {
         try { fs.unlinkSync(req.file.path); } catch (e) {}

@@ -1,7 +1,7 @@
 {
   "name": "airi-audio-server",
   "version": "1.0.0",
-  "description": "Zero-Python Node.js & C++ Audio Microservice for AIRI with OpenAI API, Voice Discovery, and CUDA Queueing",
+  "description": "Zero-Python Node.js & C++ Audio Microservice for AIRI with OpenAI API, Voice Discovery, and configurable GPU backends (CUDA/Vulkan/CPU)",
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
@@ -11,6 +11,10 @@
     "add-voicegen": "node download_voicegen.js",
     "add-sfx": "node download_sfx.js",
     "transcribe-voices": "node tools/transcribe-voices.js",
+    "gpu-info": "node tools/gpu-info.js",
+    "build:vulkan": "node tools/build-audio-cpp.js vulkan",
+    "build:cuda": "node tools/build-audio-cpp.js cuda",
+    "build:cpu": "node tools/build-audio-cpp.js cpu",
     "test": "node --test tests/voice_curation.test.js",
     "test:synthesis": "node test.js"
   },
@@ -21,6 +25,9 @@
     "asr",
     "parakeet-tdt",
     "cuda",
+    "vulkan",
+    "amd",
+    "gpu",
     "openai-api"
   ],
   "author": "AIRI",

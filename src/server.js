@@ -63,7 +63,7 @@ const tagsCsvPath = path.join(__dirname, '../supported_tags.csv');
 
 const gpuQueue = new UnifiedGpuQueue();
 const textProcessor = new TextProcessor(tagsCsvPath);
-const voiceManager = new VoiceManager(voicesDir, vocabularyPath, config.asr);
+const voiceManager = new VoiceManager(voicesDir, vocabularyPath, config.asr, config.chatterbox_voices_dir || '../chatterbox/voices', config);
 const engine = new AudioCppEngine(config);
 const musicEngine = new MusicEngine(config);
 const voiceDesigner = new VoiceDesignerEngine(config, voiceManager);
@@ -74,10 +74,16 @@ app.use(router);
 
 // Global health check endpoint
 app.get('/health', (req, res) => {
+  const diag = engine.getDiagnostics();
   res.json({
     status: 'ok',
     engine_ready: engine.isReady,
     active_model: engine.activeModel || engine.getDefaultModelId(),
+    backend: diag.backend,
+    device: diag.device,
+    engine_exe: diag.engine_exe,
+    gpu_device: diag.gpu_device,
+    cpu_fallback_detected: diag.cpu_fallback_detected,
     voice_designer_ready: voiceDesigner.isAvailable(),
     sfx_engine_ready: sfxEngine.isAvailable()
   });
@@ -87,8 +93,10 @@ const PORT = config.port || 8090;
 const HOST = config.host || '0.0.0.0';
 
 app.listen(PORT, HOST, () => {
+  const diag = engine.getDiagnostics();
   console.log("=".repeat(60));
   console.log(`[AIRI Audio Server] Running on http://${HOST}:${PORT}`);
+  console.log(`GPU Backend             : ${diag.backend || 'unresolved'} (device ${diag.device})`);
   console.log(`OpenAI Speech Endpoint  : http://localhost:${PORT}/v1/audio/speech`);
   console.log(`OpenAI Models Endpoint  : http://localhost:${PORT}/v1/models`);
   console.log(`Voice Discovery         : http://localhost:${PORT}/v1/voices`);

@@ -190,9 +190,14 @@ function runSetup() {
     } catch (e) {}
   }
 
-  const { resolveEngineBinary } = require('./src/gpu');
+  const { resolveEngineBinary, resolveBackend } = require('./src/gpu');
   let audioCppDir = config.audio_cpp?.working_dir || "../audio.cpp";
-  let resolvedServerExe = resolveEngineBinary('audiocpp_server', config.audio_cpp?.server_exe) || resolvePath(config.audio_cpp?.server_exe || path.join(audioCppDir, "build/windows-cuda-release/bin/audiocpp_server.exe"));
+  const backendInfo = resolveBackend(config);
+  const buildBackend = backendInfo.backend || 'vulkan';
+  const buildDirName = buildBackend === 'cuda'
+    ? 'windows-cuda-release'
+    : (buildBackend === 'vulkan' ? 'windows-vulkan-release' : `windows-${buildBackend}-release`);
+  let resolvedServerExe = resolveEngineBinary('audiocpp_server', config.audio_cpp?.server_exe, buildBackend, config) || resolvePath(config.audio_cpp?.server_exe || path.join(audioCppDir, `build/${buildDirName}/bin/audiocpp_server.exe`));
 
   const rl = readline.createInterface({
     input: process.stdin,
@@ -212,7 +217,7 @@ function runSetup() {
         const customPath = userPath.trim();
         if (customPath) {
           audioCppDir = customPath;
-          const newExePath = path.join(audioCppDir, "build/windows-cuda-release/bin/audiocpp_server.exe");
+          const newExePath = path.join(audioCppDir, `build/${buildDirName}/bin/audiocpp_server.exe`);
           if (!config.audio_cpp) config.audio_cpp = {};
           config.audio_cpp.working_dir = audioCppDir;
           config.audio_cpp.server_exe = newExePath;
@@ -272,13 +277,17 @@ function runSetup() {
         allow_unfiltered_tags: selected.family === 'fish_audio' || selected.family === 'higgs_audio_tts'
       };
 
-      // Ensure ASR configuration is set to native Citrinet ASR
+      // Persist the GPU backend selection so the server and CLI tools agree.
+      if (!config.gpu) {
+        config.gpu = { backend: backendInfo.requested || 'auto', device: 0, vulkan_sdk_path: '' };
+      }
+      // Ensure ASR configuration is set to native Citrinet ASR (backend follows gpu.backend).
       if (!config.asr || config.asr.family === 'parakeet_tdt') {
         config.asr = {
-          cli_exe: "bin/windows-cuda/audiocpp_cli.exe",
+          cli_exe: "",
           model_path: "models/Citrinet-ASR-GGUF/citrinet-asr-q8_0.gguf",
           family: "citrinet_asr",
-          backend: "cuda"
+          backend: "auto"
         };
       }
 

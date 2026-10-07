@@ -89,7 +89,7 @@ async function main() {
 
     try {
       console.log(`[Transcribing] ${voiceId} (${audioFileName})...`);
-      const transcript = await transcribeAudio(audioPath, asrConfig);
+      const transcript = await transcribeAudio(audioPath, asrConfig, config);
 
       if (!transcript || transcript === PLACEHOLDER) {
         failed.push(`${voiceId} (no transcript produced)`);

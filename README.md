@@ -76,17 +76,48 @@ AIRI Audio Server natively supports the following 6 core TTS models with **1-cli
 
 ---
 
+## 🧩 GPU Backends (CUDA / Vulkan / CPU)
+
+The inference backend is fully configurable and never falls back to CPU silently.
+
+```json
+"gpu": {
+  "backend": "auto",
+  "device": 0,
+  "vulkan_sdk_path": ""
+}
+```
+
+- `auto` (default): **CUDA** when a real NVIDIA GPU is detected, otherwise **Vulkan** when a Vulkan-capable adapter is present (e.g. AMD Radeon), otherwise a hard error.
+- Environment overrides: `AIRI_GPU_BACKEND=cuda|vulkan|cpu` and `AIRI_GPU_DEVICE=<index>`.
+- The NVIDIA/CUDA path is unchanged: bundled binaries in `bin/windows-cuda/` keep working.
+- **AMD users:** see [`docs/AMD_VULKAN.md`](docs/AMD_VULKAN.md) and run `install-vulkan.bat`.
+
+Diagnose the selected backend and GPU device at any time:
+
+```cmd
+npm run gpu-info
+```
+
+---
+
 ## 🚀 1-Click Automated Setup
 
 Double-click `install.bat` on Windows! The installer automatically:
 1. Installs Node.js dependencies (`npm install`).
 2. Verifies FFmpeg in system PATH (or offers automatic installation via `winget`).
 3. Clones the official `audio.cpp` C++ engine repository if missing (`git clone https://github.com/0xShug0/audio.cpp`).
-4. Verifies/compiles CUDA release binaries (`audiocpp_server.exe` and `audiocpp_cli.exe` via `cmake -DGGML_CUDA=ON`).
-5. Launches the interactive model setup wizard (`node setup.js`), which auto-downloads Parakeet TDT ASR weights and your chosen TTS model!
+4. Detects your GPU backend and builds the matching `audio.cpp` release binaries (`audiocpp_server.exe`, `audiocpp_cli.exe`) — CUDA or Vulkan — reporting exactly which prerequisites are missing.
+5. Launches the interactive model setup wizard (`node setup.js`), then prints GPU/backend diagnostics.
 
 ```cmd
 install.bat
+```
+
+For an AMD Radeon GPU (Vulkan), use the dedicated installer instead:
+
+```cmd
+install-vulkan.bat
 ```
 
 ---
@@ -99,18 +130,23 @@ All configuration parameters are fully exposed and customizable in `config.json`
 {
   "port": 8095,
   "host": "0.0.0.0",
+  "gpu": {
+    "backend": "auto",
+    "device": 0,
+    "vulkan_sdk_path": ""
+  },
   "audio_cpp": {
-    "server_exe": "../audio.cpp/build/windows-cuda-release/bin/audiocpp_server.exe",
+    "server_exe": "",
     "working_dir": "../audio.cpp",
     "internal_port": 8080,
     "stream_frame_interval": 25,
     "keep_alive_interval_ms": 0
   },
   "asr": {
-    "cli_exe": "../audio.cpp/build/windows-cuda-release/bin/audiocpp_cli.exe",
-    "model_path": "../audio.cpp/models/Parakeet-TDT-0.6B-v3-GGUF/parakeet-tdt-0.6b-v3-q8_0.gguf",
-    "family": "parakeet_tdt",
-    "backend": "cuda"
+    "cli_exe": "",
+    "model_path": "models/Citrinet-ASR-GGUF/citrinet-asr-q8_0.gguf",
+    "family": "citrinet_asr",
+    "backend": "auto"
   },
   "chatterbox_voices_dir": "../chatterbox/voices",
   "installed_models": [
@@ -176,6 +212,20 @@ npm run add-sfx
 npm run transcribe-voices
 ```
 *(Rebuilds accurate reference transcripts for all clips in `voices/` via Citrinet ASR)*
+
+### GPU / Backend Diagnostics
+```cmd
+npm run gpu-info
+```
+*(Shows the resolved backend, GPU device, engine binary path, Vulkan SDK, and live `/health`)*
+
+### Build the Engine for a Backend
+```cmd
+npm run build:vulkan
+npm run build:cuda
+npm run build:cpu
+```
+*(Builds `audiocpp_server` + `audiocpp_cli`, reporting missing prerequisites instead of failing silently)*
 
 ---
 

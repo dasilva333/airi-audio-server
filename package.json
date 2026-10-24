@@ -12,7 +12,7 @@
     "add-sfx": "node download_sfx.js",
     "add-drama3": "node download_drama3.js",
     "transcribe-voices": "node tools/transcribe-voices.js",
-    "test": "node --test tests/voice_curation.test.js",
+    "test": "node --test tests/voice_curation.test.js tests/ffmpeg.test.js",
     "test:synthesis": "node test.js"
   },
   "keywords": [

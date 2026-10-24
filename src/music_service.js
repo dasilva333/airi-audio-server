@@ -8,9 +8,9 @@ const path = require('path');
  * request normalisation, GPU queue dispatch, job lifecycle, and the on-disk track
  * library, so neither transport re-implements the other's rules.
  *
- * The GPU queue cannot interrupt a running task, so cancellation is only honoured
- * for jobs that have not started yet. A running job reports `cancel_unsupported`
- * rather than pretending it stopped.
+ * Cancellation aborts the job's AbortController, which the engine uses to kill the
+ * spawned CLI, so a running render genuinely stops instead of continuing to burn
+ * GPU time in the background.
  */
 
 let idCounter = 0;
@@ -79,7 +79,8 @@ class MusicService {
       // 600 was truncating long-form scores mid-bar; a 2 minute composition
       // needs roughly 1.2-1.5k tokens of ABC.
       abcMaxTokens: body.abc_max_tokens || body.abcMaxTokens || 1600,
-      lora: body.lora || null
+      lora: body.lora || null,
+      title: body.title || null
     };
   }
 
@@ -156,12 +157,16 @@ class MusicService {
   }
 
   _enqueueJob(job, run) {
+    // One controller per job: cancelling job A must not touch a queued job B.
+    const controller = new AbortController();
+    job.abortController = controller;
+
     return this.gpuQueue.enqueue(async () => {
       if (job.state === 'cancelled') throw new JobCancelledError();
       job.state = 'running';
       job.progress = { percent: 5, stage: 'running' };
       job.updatedAt = Date.now();
-      return await run();
+      return await run(controller.signal);
     });
   }
 
@@ -180,11 +185,12 @@ class MusicService {
     const job = this._createJob('plan', {
       prompt: params.prompt,
       lyrics: params.lyrics,
-      cot: params.cot
+      cot: params.cot,
+      title: params.title
     });
     this.jobs.set(job.id, job);
 
-    this._enqueueJob(job, () => this._callEngine('plan', params)).then(
+    this._enqueueJob(job, signal => this._callEngine('plan', { ...params, signal })).then(
       (result) => {
         job.state = 'done';
         job.progress = { percent: 100, stage: 'done' };
@@ -192,7 +198,8 @@ class MusicService {
           planId: job.id,
           abcScore: result && result.abc_score ? result.abc_score : null,
           prompt: params.prompt,
-          cot: params.cot
+          cot: params.cot,
+          title: (result && result.title) || params.title || null
         };
         job.updatedAt = Date.now();
         job.next = 'The score is ready. Show it to the user, discuss changes, then call action="generate" with the final abcScore.';
@@ -209,7 +216,7 @@ class MusicService {
     const job = this._createJob('render', params);
     this.jobs.set(job.id, job);
 
-    this._enqueueJob(job, () => this._callEngine('render', params)).then(
+    this._enqueueJob(job, signal => this._callEngine('render', { ...params, signal })).then(
       (result) => this._completeRender(job, params, result),
       (error) => this._failJob(job, error)
     );
@@ -218,6 +225,12 @@ class MusicService {
   }
 
   _completeRender(job, params, result) {
+    // A cancel can land while the CLI is finishing; do not resurrect the job.
+    if (job.state === 'cancelled') {
+      job.updatedAt = Date.now();
+      return;
+    }
+
     try {
       const fileName = `${job.id}.wav`;
       fs.writeFileSync(path.join(this.libraryDir, fileName), result.audio_buffer);
@@ -245,9 +258,12 @@ class MusicService {
   }
 
   _failJob(job, error) {
-    if (error instanceof JobCancelledError) {
+    if (error instanceof JobCancelledError || (error && error.name === 'AbortError')) {
       job.state = 'cancelled';
+      job.progress = { percent: 0, stage: 'cancelled' };
       job.updatedAt = Date.now();
+      job.next = 'The job was cancelled. Start a new plan or generate when ready.';
+      this._trimJobs();
       return;
     }
     job.state = 'failed';
@@ -283,12 +299,21 @@ class MusicService {
     }
 
     if (job.state === 'running') {
-      // Honest limitation: the GPU queue has no abort hook and the engine spawns
-      // its CLI internally, so the render will keep running to completion.
+      // The engine now kills the spawned CLI on abort, so a running job really
+      // stops instead of continuing to burn GPU time in the background.
+      if (job.abortController) {
+        job.abortController.abort();
+        job.state = 'cancelled';
+        job.progress = { percent: 0, stage: 'cancelled' };
+        job.updatedAt = Date.now();
+        job.next = 'The render was cancelled. Start a new plan or generate when ready.';
+        return { ...this.publicJob(job), cancelSupported: true, cancelReason: null };
+      }
+
       return {
         ...this.publicJob(job),
         cancelSupported: false,
-        cancelReason: 'The render is already running and cannot be interrupted; it will finish in the background and appear in the library.'
+        cancelReason: 'This job has no abort handle and cannot be interrupted.'
       };
     }
 
@@ -361,7 +386,12 @@ class MusicService {
       progress: job.progress,
       next: job.next,
       plan: job.result
-        ? { planId: job.result.planId, abcScore: job.result.abcScore, cot: job.result.cot }
+        ? {
+            planId: job.result.planId,
+            abcScore: job.result.abcScore,
+            cot: job.result.cot,
+            title: job.result.title
+          }
         : undefined,
       track: job.track ? this._publicTrack(job.track) : undefined,
       error: job.error || undefined

@@ -80,6 +80,36 @@ function getCudaPaths(customCudaPath) {
   return Array.from(detectedPaths);
 }
 
+/**
+ * Kills the spawned CLI when the caller aborts. Without this a cancelled job
+ * keeps rendering in the background and keeps the GPU busy, which defeats the
+ * point of cancelling.
+ */
+function attachAbort(signal, proc) {
+  if (!signal) return () => {};
+
+  const kill = () => {
+    try {
+      proc.kill();
+    } catch (e) {}
+  };
+
+  if (signal.aborted) {
+    kill();
+    return () => {};
+  }
+
+  signal.addEventListener('abort', kill, { once: true });
+  return () => signal.removeEventListener('abort', kill);
+}
+
+function abortedError() {
+  const error = new Error('Music job cancelled.');
+  error.name = 'AbortError';
+  error.code = 'ABORT_ERR';
+  return error;
+}
+
 class MusicEngine {
   constructor(config) {
     this.config = config;
@@ -107,7 +137,9 @@ class MusicEngine {
       lyrics = '',
       cot = 'full',
       abcMaxTokens = 600,
-      lora = null
+      lora = null,
+      title = null,
+      signal = null
     } = options;
 
     const cliExe = resolveEngineBinary('audiocpp_cli', this.config.audio_cpp?.cli_exe);
@@ -163,14 +195,31 @@ class MusicEngine {
       let stdout = '';
       let stderr = '';
 
+      const detachAbort = attachAbort(signal, proc);
+
       proc.stdout.on('data', d => { stdout += d.toString(); });
       proc.stderr.on('data', d => { stderr += d.toString(); });
 
       proc.on('close', (code) => {
+        detachAbort();
+
+        if (signal && signal.aborted) {
+          try {
+            fs.rmSync(tempOutDir, { recursive: true, force: true });
+          } catch (e) {}
+          return reject(abortedError());
+        }
+
         const scorePath = path.join(tempOutDir, 'score.abc');
         let scoreAbc = '';
         if (fs.existsSync(scorePath)) {
           scoreAbc = fs.readFileSync(scorePath, 'utf8');
+        }
+
+        // The CLI emits an empty `T:` field; give the plan a usable title when
+        // the caller supplied one so results are referencable by name.
+        if (title && /^T:[ \t]*$/m.test(scoreAbc)) {
+          scoreAbc = scoreAbc.replace(/^T:[ \t]*$/m, `T:${title}`);
         }
 
         try {
@@ -182,14 +231,16 @@ class MusicEngine {
             success: true,
             abc_score: scoreAbc,
             prompt,
-            cot
+            cot,
+            title: title || null
           });
         } else {
           resolve({
             success: true,
-            abc_score: `% Generated Score Plan\nX:1\nT:Untitled\nM:4/4\nL:1/8\nQ:1/4=128\nK:C\n|: C4 G4 | A4 F4 :|`,
+            abc_score: `% Generated Score Plan\nX:1\nT:${title || 'Untitled'}\nM:4/4\nL:1/8\nQ:1/4=128\nK:C\n|: C4 G4 | A4 F4 :|`,
             prompt,
-            cot
+            cot,
+            title: title || null
           });
         }
       });
@@ -210,7 +261,8 @@ class MusicEngine {
       abcMaxTokens = 600,
       durationSeconds = 60,
       inferenceSteps = 8,
-      lora = null
+      lora = null,
+      signal = null
     } = options;
 
     const cliExe = resolveEngineBinary('audiocpp_cli', this.config.audio_cpp?.cli_exe);
@@ -283,6 +335,8 @@ class MusicEngine {
       let stdout = '';
       let stderr = '';
 
+      const detachAbort = attachAbort(signal, proc);
+
       proc.stdout.on('data', d => {
         const str = d.toString();
         stdout += str;
@@ -296,6 +350,15 @@ class MusicEngine {
       });
 
       proc.on('close', (code) => {
+        detachAbort();
+
+        if (signal && signal.aborted) {
+          try {
+            fs.rmSync(tempDir, { recursive: true, force: true });
+          } catch (e) {}
+          return reject(abortedError());
+        }
+
         const latencyMs = Date.now() - tStart;
         if (code === 0 && fs.existsSync(outputWav) && fs.statSync(outputWav).size > 44) {
           const wavBuffer = fs.readFileSync(outputWav);

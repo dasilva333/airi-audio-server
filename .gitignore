@@ -30,3 +30,6 @@ run_*.js
 server.log
 voices/vocabulary.json
 voices/archive/ 
+
+# Generated music library (audio + index.json)
+music_library/

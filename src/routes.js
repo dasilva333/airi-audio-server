@@ -43,7 +43,7 @@ function parseWavDuration(buffer) {
   return (buffer.length - 44) / byteRate;
 }
 
-function createRouter(engine, voiceManager, textProcessor, gpuQueue, config, musicEngine = null, voiceDesigner = null, sfxEngine = null) {
+function createRouter(engine, voiceManager, textProcessor, gpuQueue, config, musicEngine = null, voiceDesigner = null, sfxEngine = null, musicService = null) {
   const router = express.Router();
 
   // GET /v1/models (OpenAI Specification)
@@ -139,7 +139,13 @@ function createRouter(engine, voiceManager, textProcessor, gpuQueue, config, mus
           'yue-2': 48000,
           'minimax-music3': 44100
         }
-      }
+      },
+      mcp: musicService
+        ? {
+            transport: 'streamable-http',
+            url: `${req.protocol}://${req.get('host')}/mcp`
+          }
+        : { transport: null, url: null }
     });
   };
   router.get('/v1/capabilities', handleCapabilities);
@@ -421,66 +427,35 @@ function createRouter(engine, voiceManager, textProcessor, gpuQueue, config, mus
   // POST /v1/audio/music/plan (Music Room / Sound Studio ABC Planner)
   router.post('/v1/audio/music/plan', async (req, res) => {
     try {
-      if (!musicEngine) {
+      if (!musicEngine || !musicService) {
         return res.status(503).json({ error: { message: "Music engine not initialized." } });
       }
 
-      const { prompt, lyrics, cot = 'full', abc_max_tokens = 600, lora } = req.body || {};
-      if (!prompt && !lyrics) {
-        return res.status(400).json({ error: { message: "Either 'prompt' or 'lyrics' is required for music planning." } });
-      }
-
-      const result = await gpuQueue.enqueue(async () => {
-        return await musicEngine.planComposition({
-          prompt: prompt || '',
-          lyrics: lyrics || '',
-          cot,
-          abcMaxTokens: abc_max_tokens,
-          lora
-        });
-      });
+      // Normalisation and dispatch live in MusicService, shared with MCP.
+      const params = musicService.normalizePlanRequest(req.body || {});
+      const result = await musicService.planSync(params);
 
       return res.status(200).json(result);
     } catch (err) {
-      console.error(`[Music Plan Error] ${err.stack || err.message}`);
-      return res.status(500).json({ error: { message: err.message } });
+      const status = err.statusCode || 500;
+      if (status >= 500) console.error(`[Music Plan Error] ${err.stack || err.message}`);
+      return res.status(status).json({ error: { message: err.message } });
     }
   });
 
   // POST /v1/audio/music (Generative Track Synthesis)
   router.post('/v1/audio/music', async (req, res) => {
     try {
-      if (!musicEngine) {
+      if (!musicEngine || !musicService) {
         return res.status(503).json({ error: { message: "Music engine not initialized." } });
       }
 
       const body = req.body || {};
-      const model = body.model || 'yue2';
-      const prompt = body.prompt || body.style || body.input || '';
-      const lyrics = body.lyrics || body.text || '';
-      const cot = body.cot || 'full';
-      const abc_score = body.abc_score || body.abc || null;
-      const duration_seconds = body.duration_seconds || body.duration || 60;
-      const inference_steps = body.inference_steps || body.steps || 8;
       const response_format = body.response_format || 'wav';
-      const lora = body.lora || null;
 
-      if (!prompt && !lyrics && !abc_score) {
-        return res.status(400).json({ error: { message: "Either 'prompt', 'lyrics', or 'abc_score' must be provided." } });
-      }
-
-      const result = await gpuQueue.enqueue(async () => {
-        return await musicEngine.renderMusic({
-          model,
-          prompt,
-          lyrics,
-          cot,
-          abcScore: abc_score,
-          durationSeconds: duration_seconds,
-          inferenceSteps: inference_steps,
-          lora
-        });
-      });
+      // Same normalisation the MCP `generate` action uses.
+      const params = musicService.normalizeRenderRequest(body);
+      const result = await musicService.renderSync(params);
 
       let finalAudio = result.audio_buffer;
       let contentType = 'audio/wav';
@@ -500,8 +475,9 @@ function createRouter(engine, voiceManager, textProcessor, gpuQueue, config, mus
 
       return res.status(200).send(finalAudio);
     } catch (err) {
-      console.error(`[Music API Error] ${err.stack || err.message}`);
-      return res.status(500).json({ error: { message: err.message } });
+      const status = err.statusCode || 500;
+      if (status >= 500) console.error(`[Music API Error] ${err.stack || err.message}`);
+      return res.status(status).json({ error: { message: err.message } });
     }
   });
 
@@ -738,6 +714,56 @@ function createRouter(engine, voiceManager, textProcessor, gpuQueue, config, mus
       console.error(`[SFX API Error] ${err.stack || err.message}`);
       return res.status(500).json({ error: { message: err.message } });
     }
+  });
+
+  // ---------------------------------------------------------------------------
+  // Music job & library surface. Same MusicService the MCP tool calls, so REST
+  // clients can inspect and poll the exact state the agent sees.
+  // ---------------------------------------------------------------------------
+
+  const requireMusicService = (res) => {
+    if (musicService) return true;
+    res.status(503).json({ error: { message: 'Music service not initialized.' } });
+    return false;
+  };
+
+  router.get('/v1/audio/music/jobs', (req, res) => {
+    if (!requireMusicService(res)) return;
+    return res.json({ jobs: musicService.listJobs() });
+  });
+
+  router.get('/v1/audio/music/jobs/:id', (req, res) => {
+    if (!requireMusicService(res)) return;
+    try {
+      return res.json(musicService.getJob(req.params.id));
+    } catch (err) {
+      return res.status(err.statusCode || 500).json({ error: { message: err.message } });
+    }
+  });
+
+  router.delete('/v1/audio/music/jobs/:id', (req, res) => {
+    if (!requireMusicService(res)) return;
+    try {
+      return res.json(musicService.cancelJob(req.params.id));
+    } catch (err) {
+      return res.status(err.statusCode || 500).json({ error: { message: err.message } });
+    }
+  });
+
+  router.get('/v1/audio/music/library', (req, res) => {
+    if (!requireMusicService(res)) return;
+    return res.json({
+      tracks: musicService.listTracks({ query: req.query.q || '', limit: req.query.limit })
+    });
+  });
+
+  router.get('/v1/audio/music/library/:file', (req, res) => {
+    if (!requireMusicService(res)) return;
+    const filePath = musicService.resolveTrackFile(req.params.file);
+    if (!filePath) {
+      return res.status(404).json({ error: { message: 'Track not found.' } });
+    }
+    return res.sendFile(filePath);
   });
 
   return router;

@@ -49,6 +49,8 @@ const TextProcessor = require('./text');
 const AudioCppEngine = require('./engine');
 const VoiceManager = require('./voices');
 const MusicEngine = require('./music');
+const MusicService = require('./music_service');
+const { mountMusicMcp } = require('./mcp_music');
 const VoiceDesignerEngine = require('./voice_design');
 const SfxEngine = require('./sfx');
 const createRouter = require('./routes');
@@ -66,11 +68,18 @@ const textProcessor = new TextProcessor(tagsCsvPath);
 const voiceManager = new VoiceManager(voicesDir, vocabularyPath, config.asr);
 const engine = new AudioCppEngine(config);
 const musicEngine = new MusicEngine(config);
+const musicService = new MusicService(musicEngine, gpuQueue, {
+  libraryDir: path.join(__dirname, '../music_library'),
+  port: config.port || 8095
+});
 const voiceDesigner = new VoiceDesignerEngine(config, voiceManager);
 const sfxEngine = new SfxEngine(config);
 
-const router = createRouter(engine, voiceManager, textProcessor, gpuQueue, config, musicEngine, voiceDesigner, sfxEngine);
+const router = createRouter(engine, voiceManager, textProcessor, gpuQueue, config, musicEngine, voiceDesigner, sfxEngine, musicService);
 app.use(router);
+
+// MCP shares the same Express app and the same MusicService the REST routes use.
+mountMusicMcp(app, musicService);
 
 // Global health check endpoint
 app.get('/health', (req, res) => {
@@ -96,6 +105,8 @@ app.listen(PORT, HOST, () => {
   console.log(`Generative Music Engine : http://localhost:${PORT}/v1/audio/music`);
   console.log(`ABC Score Music Planner : http://localhost:${PORT}/v1/audio/music/plan`);
   console.log(`LoRA Cartridge Manager  : http://localhost:${PORT}/v1/audio/music/loras`);
+  console.log(`Music Job & Library API : http://localhost:${PORT}/v1/audio/music/jobs`);
+  console.log(`MCP (Streamable HTTP)   : http://localhost:${PORT}/mcp`);
   console.log(`Voice Designer Endpoint : http://localhost:${PORT}/v1/audio/voice-design`);
   console.log(`Sound Effects (SFX)     : http://localhost:${PORT}/v1/audio/sfx`);
   console.log("=".repeat(60));

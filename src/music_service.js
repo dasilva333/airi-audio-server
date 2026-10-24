@@ -13,11 +13,47 @@ const path = require('path');
  * GPU time in the background.
  */
 
-let idCounter = 0;
+/**
+ * Readable job identifiers.
+ *
+ * Characters read receipts out loud, and `plan_mvlqsf8102` is noise to a listener.
+ * Three distinct words from a fixed vocabulary give ~1M combinations, which is
+ * plenty for a session-scoped job registry, and collisions are checked against
+ * live jobs and the on-disk library before use.
+ */
+const ID_WORDS = [
+  'amber', 'atlas', 'aurora', 'basil', 'bloom', 'bolt', 'breeze', 'canyon', 'cedar', 'chord',
+  'cipher', 'clover', 'comet', 'copper', 'coral', 'cosmos', 'crown', 'crystal', 'dawn', 'delta',
+  'drift', 'echo', 'ember', 'ether', 'fable', 'falcon', 'feather', 'fizz', 'flare', 'frost',
+  'galaxy', 'garnet', 'ghost', 'glacier', 'glow', 'grove', 'harbor', 'haze', 'heron', 'honey',
+  'horizon', 'indigo', 'ivory', 'jade', 'jubilee', 'juniper', 'kestrel', 'kingdom', 'lantern', 'lark',
+  'lava', 'legend', 'lily', 'lotus', 'lunar', 'maple', 'marble', 'meadow', 'melody', 'meteor',
+  'midnight', 'mirror', 'mist', 'monsoon', 'moon', 'moss', 'nebula', 'nectar', 'nickel', 'night',
+  'nova', 'oak', 'oasis', 'ocean', 'onyx', 'opal', 'orbit', 'orchid', 'pebble', 'pepper',
+  'pixel', 'plum', 'prism', 'quartz', 'quill', 'rain', 'raven', 'reef', 'reverie', 'ripple',
+  'river', 'rogue', 'rose', 'ruby', 'saffron', 'sage', 'sapphire', 'satin', 'scarlet', 'shadow',
+  'silver', 'sky', 'smoke', 'snow', 'solar', 'sonic', 'spark', 'sparrow', 'spirit', 'star',
+  'static', 'steel', 'storm', 'summit', 'sun', 'swift', 'tango', 'tempo', 'thistle', 'thunder',
+  'tide', 'tiger', 'timber', 'topaz', 'tulip', 'twilight', 'umber', 'velvet', 'verse', 'violet',
+  'vivid', 'wave', 'willow', 'wind', 'winter', 'wolf', 'wonder', 'zephyr', 'zinc'
+];
 
-function nextId(prefix) {
-  idCounter = (idCounter + 1) % 100000;
-  return `${prefix}_${Date.now().toString(36)}${idCounter.toString(36).padStart(2, '0')}`;
+function randomSlugWords(count = 3) {
+  const picked = [];
+  while (picked.length < count) {
+    const word = ID_WORDS[Math.floor(Math.random() * ID_WORDS.length)];
+    if (!picked.includes(word)) picked.push(word);
+  }
+  return picked.join('-');
+}
+
+function nextId(prefix, isTaken) {
+  for (let attempt = 0; attempt < 64; attempt++) {
+    const candidate = `${prefix}-${randomSlugWords(3)}`;
+    if (!isTaken(candidate)) return candidate;
+  }
+  // Astronomically unlikely; keep the readable shape rather than a bare timestamp.
+  return `${prefix}-${randomSlugWords(4)}`;
 }
 
 class JobCancelledError extends Error {
@@ -103,6 +139,11 @@ const MUSIC_CAPABILITIES = Object.freeze({
   cot: {
     modes: ['full', 'melody', 'off'],
     note: '"full" produces dual-staff vocal+instrumental planning and the best coherence; "melody" is faster and single-staff; "off" skips planning entirely. cot="off" is rejected when abcScore is supplied.'
+  },
+  ids: {
+    format: 'readable-slug',
+    examples: ['plan-ember-quartz-tide', 'song-velvet-thunder-lark'],
+    note: 'Job and track ids are three-word slugs so they read naturally when spoken aloud. Pass them back verbatim; they are the only handle for status and cancel.'
   },
   workflow: [
     'plan (prompt/lyrics) -> receipt',
@@ -220,7 +261,7 @@ class MusicService {
   // --------------------------------------------------------------------- jobs
 
   _createJob(kind, params) {
-    const id = nextId(kind === 'plan' ? 'plan' : 'job');
+    const id = nextId(kind === 'plan' ? 'plan' : 'song', candidate => this._isIdTaken(candidate));
     const now = Date.now();
     const waitHint = kind === 'plan'
       ? 'about 20 seconds'
@@ -260,6 +301,11 @@ class MusicService {
       job.updatedAt = Date.now();
       return await run(controller.signal);
     });
+  }
+
+  _isIdTaken(candidate) {
+    if (this.jobs.has(candidate)) return true;
+    return this._readIndex().some(track => track.id === candidate);
   }
 
   _trimJobs() {

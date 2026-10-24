@@ -76,7 +76,9 @@ class MusicService {
       prompt,
       lyrics,
       cot: body.cot || 'full',
-      abcMaxTokens: body.abc_max_tokens || body.abcMaxTokens || 600,
+      // 600 was truncating long-form scores mid-bar; a 2 minute composition
+      // needs roughly 1.2-1.5k tokens of ABC.
+      abcMaxTokens: body.abc_max_tokens || body.abcMaxTokens || 1600,
       lora: body.lora || null
     };
   }
@@ -128,11 +130,13 @@ class MusicService {
     const id = nextId(kind === 'plan' ? 'plan' : 'job');
     const now = Date.now();
     const waitHint = kind === 'plan'
-      ? 'about 10 seconds'
-      : 'about 45 seconds';
+      ? 'about 20 seconds'
+      : 'about 3 minutes';
+    // Measured on an RTX 4070 Laptop (8GB): YuE 2 base ~15x real time in the
+    // shootout benchmarks, ~10.7x on a warm 30s render through this server.
     const durationHint = kind === 'plan'
-      ? 'Planning a track usually takes 3-20 seconds.'
-      : 'A 60 second track usually takes 1-3 minutes; a 2 minute track can take much longer, so wait longer before assuming failure.';
+      ? 'Planning usually takes 3-20 seconds, though a cold start can take up to a minute while the model loads.'
+      : 'Rendering runs at roughly 10-15x real time on an 8GB laptop GPU: about 5-8 minutes for 30 seconds of audio, 10-15 minutes for 60 seconds, and 20-27 minutes for a 2 minute track. Do not assume failure before then.';
 
     return {
       id,

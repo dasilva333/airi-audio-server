@@ -23,8 +23,9 @@ const MUSIC_TOOL_DESCRIPTION = [
   '"cancel" cancels a job that has not started yet.',
   'plan and generate return a receipt immediately and never block,',
   'so always follow up with action="status" using the returned jobId.',
-  'Check status at most once per turn: planning usually takes 3-20 seconds,',
-  'and a 60 second render usually takes 1-3 minutes.',
+  'Check status at most once per turn. Planning takes seconds to about a minute;',
+  'rendering runs at roughly 10-15x real time, so 30 seconds of audio takes 5-8 minutes',
+  'and a 2 minute track takes 20-27 minutes.',
   'Preferred flow: plan, show the ABC score to the user and discuss changes,',
   'then generate with the final abcScore.'
 ].join(' ');
@@ -46,6 +47,8 @@ const musicInputSchema = {
     .describe('Requested track length in seconds. Defaults to 60.'),
   cot: z.enum(['full', 'melody', 'off']).optional()
     .describe('Chain-of-thought depth for score planning. "full" is the best quality and the slowest.'),
+  abcMaxTokens: z.number().int().min(200).max(4000).optional()
+    .describe('Token budget for the ABC score when planning. Raise it if a score comes back cut off mid-bar. Defaults to 1600.'),
   abcScore: z.string().optional()
     .describe('An ABC notation score to render, or to mutate when planning. Overrides prompt/lyrics derived structure.'),
 

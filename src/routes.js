@@ -727,6 +727,11 @@ function createRouter(engine, voiceManager, textProcessor, gpuQueue, config, mus
     return false;
   };
 
+  router.get('/v1/audio/music/describe', (req, res) => {
+    if (!requireMusicService(res)) return;
+    return res.json(musicService.describeCapabilities());
+  });
+
   router.get('/v1/audio/music/jobs', (req, res) => {
     if (!requireMusicService(res)) return;
     return res.json({ jobs: musicService.listJobs() });

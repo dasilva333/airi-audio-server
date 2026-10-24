@@ -304,10 +304,13 @@ class MusicEngine {
       cliArgs.push('--session-option', 'yue2.model_gguf=yue2-3b-q4_0.gguf');
       cliArgs.push('--session-option', 'yue2.nar_graph_arena_mb=2048');
       cliArgs.push('--session-option', 'yue2.ar_prefill_graph_arena_mb=2048');
+      // Always forward the requested cot. Skipping it when an external score was
+      // supplied silently fell back to the engine default, so a caller asking for
+      // cot=off believed it had been applied when it had not.
+      cliArgs.push('--request-option', `cot=${cot}`);
       if (abcScore) {
         cliArgs.push('--request-option', `abc=${abcScore}`);
       } else {
-        cliArgs.push('--request-option', `cot=${cot}`);
         cliArgs.push('--request-option', `abc_max_tokens=${abcMaxTokens}`);
       }
     }

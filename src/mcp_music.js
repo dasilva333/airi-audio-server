@@ -26,13 +26,15 @@ const MUSIC_TOOL_DESCRIPTION = [
   'Check status at most once per turn. Planning takes seconds to about a minute;',
   'rendering runs at roughly 10-15x real time, so 30 seconds of audio takes 5-8 minutes',
   'and a 2 minute track takes 20-27 minutes.',
+  'Call action="describe" before composing a score if you need the supported ABC format,',
+  'voice layout, or engine limits.',
   'Preferred flow: plan, show the ABC score to the user and discuss changes,',
   'then generate with the final abcScore.'
 ].join(' ');
 
 const musicInputSchema = {
-  action: z.enum(['plan', 'generate', 'status', 'list', 'cancel'])
-    .describe('Which music operation to run. plan/generate return a job receipt; poll it with status.'),
+  action: z.enum(['describe', 'plan', 'generate', 'status', 'list', 'cancel'])
+    .describe('Which music operation to run. Use "describe" for the ABC format and engine limits. plan/generate return a job receipt; poll it with status.'),
 
   // Planning / rendering inputs
   prompt: z.string().optional()
@@ -46,11 +48,11 @@ const musicInputSchema = {
   durationSeconds: z.number().int().min(5).max(300).optional()
     .describe('Requested track length in seconds. Defaults to 60.'),
   cot: z.enum(['full', 'melody', 'off']).optional()
-    .describe('Chain-of-thought depth for score planning. "full" is the best quality and the slowest.'),
+    .describe('Chain-of-thought depth for score planning. "full" is the best quality and the slowest. "off" is rejected when abcScore is supplied, because an external score requires planning.'),
   abcMaxTokens: z.number().int().min(200).max(4000).optional()
     .describe('Token budget for the ABC score when planning. Raise it if a score comes back cut off mid-bar. Defaults to 1600.'),
   abcScore: z.string().optional()
-    .describe('An ABC notation score to render, or to mutate when planning. Overrides prompt/lyrics derived structure.'),
+    .describe('An ABC score used as a conditioning prefix for the renderer, not a literal transcription: it biases the model toward a structure rather than dictating notes. Use the engine\'s own dual-staff shape (V: Vocal plus V: Ins, chords quoted like "Cm" on the instrumental staff). Output length comes from durationSeconds, not from the bar count. Call action="describe" for the full format and a template.'),
 
   // Job addressing
   jobId: z.string().optional()
@@ -87,6 +89,9 @@ async function dispatchMusicAction(service, args = {}) {
   const action = String(args.action || '').toLowerCase();
 
   switch (action) {
+    case 'describe':
+      return service.describeCapabilities();
+
     case 'plan':
       return service.startPlanJob(args);
 

@@ -39,6 +39,86 @@ function notFound(message) {
   return error;
 }
 
+/**
+ * Contract returned by the `describe` action.
+ *
+ * ABC is not parsed by the engine: `pipeline.cpp` tokenises the score and feeds
+ * it as an `<abc>` prefix before the acoustic stage. So these are not grammar
+ * rules enforced by a parser — they describe the distribution YuE 2 was trained
+ * on, which is what actually determines whether a score steers the render well.
+ */
+const SCORE_TEMPLATE = [
+  'X:1',
+  'T:Neon Horizon',
+  'M:4/4',
+  'L:1/8',
+  'Q:1/4=118',
+  'K:G#m',
+  '% intro',
+  'V: Vocal',
+  'Z4|',
+  'V: Ins',
+  '"G#m"G2B2d2g2|"E"e4B4|"C#m"c4G4|"D#"d8|',
+  '% verse',
+  'V: Vocal',
+  'z8|d2d2c2B2|A4G4|z8|',
+  'V: Ins',
+  'G2B2d2g2|e4B4|c2e2g2c\'2|d8|'
+].join('\n');
+
+const MUSIC_CAPABILITIES = Object.freeze({
+  models: [
+    { id: 'yue2', label: 'YuE 2 (3B Q4_0)', sampleRate: 48000, realtimeFactor: '10-15x', default: true },
+    { id: 'minimax', label: 'MiniMax Music 3.0', sampleRate: 44100, realtimeFactor: '~70x', default: false }
+  ],
+  duration: {
+    minSeconds: 5,
+    maxSeconds: 300,
+    defaultSeconds: 60,
+    governsOutputLength: true,
+    note: 'Output length is driven by durationSeconds (via the semantic token budget), NOT by the number of bars in the score. A four-bar loop asked for 120 seconds will render roughly 120 seconds.'
+  },
+  abc: {
+    role: 'conditioning-prefix',
+    parsed: false,
+    validated: false,
+    note: 'The score is tokenised and supplied to the model as an <abc>...</abc> prefix before the acoustic stage. It biases the model rather than dictating notes, so literal repeat marks and exact voicings are suggestions, not guarantees.',
+    headers: ['X', 'T', 'M', 'L', 'Q', 'K'],
+    voices: [
+      { id: 'V: Vocal', purpose: 'lead vocal melody; use Z4| for instrumental sections' },
+      { id: 'V: Ins', purpose: 'instrumental/harmonic staff; this is where the melody and chords live' }
+    ],
+    chordSyntax: { example: '"G#m"G2B2d2g2', placement: 'quoted, on the instrumental staff before the bar' },
+    sections: { syntax: '% verse', examples: ['% intro', '% verse', '% chorus', '% interlude', '% drop'] },
+    rests: ['Z', 'z'],
+    requiresCot: ['melody', 'full'],
+    offDistribution: [
+      'modal keys such as K:Dmix (tokenises, but the model rarely honours them)',
+      'odd meters such as 6/8 or 7/8 jigs',
+      'literal repeat semantics (|: ... :|)',
+      'stacked chord notation such as [CEG]'
+    ],
+    template: SCORE_TEMPLATE
+  },
+  cot: {
+    modes: ['full', 'melody', 'off'],
+    note: '"full" produces dual-staff vocal+instrumental planning and the best coherence; "melody" is faster and single-staff; "off" skips planning entirely. cot="off" is rejected when abcScore is supplied.'
+  },
+  workflow: [
+    'plan (prompt/lyrics) -> receipt',
+    'status until done -> plan.abcScore',
+    'show and discuss the score with the user; edit the ABC text directly',
+    'generate with the final abcScore (and optionally durationSeconds) -> receipt',
+    'status until done -> track with audioUrl'
+  ],
+  limits: {
+    maxListLimit: 50,
+    jobHistory: 200,
+    jobsSurviveRestart: false,
+    tracksSurviveRestart: true
+  }
+});
+
 class MusicService {
   constructor(musicEngine, gpuQueue, options = {}) {
     this.musicEngine = musicEngine;
@@ -89,22 +169,34 @@ class MusicService {
     const prompt = String(body.prompt ?? body.style ?? body.input ?? '').trim();
     const lyrics = String(body.lyrics ?? body.text ?? '').trim();
     const abcScore = body.abc_score || body.abc || body.abcScore || null;
+    const cot = body.cot || 'full';
 
     if (!prompt && !lyrics && !abcScore) {
       throw badRequest("Either 'prompt', 'lyrics', or 'abc_score' must be provided.");
+    }
+
+    // The engine refuses an external score with cot=off. Fail loudly here rather
+    // than letting the caller believe cot was applied.
+    if (abcScore && cot === 'off') {
+      throw badRequest('cot="off" cannot be combined with abc_score: an external score is only consumed when cot is "melody" or "full".');
     }
 
     return {
       model: body.model || 'yue2',
       prompt,
       lyrics,
-      cot: body.cot || 'full',
+      cot,
       abcScore,
       durationSeconds: body.duration_seconds || body.duration || body.durationSeconds || 60,
       inferenceSteps: body.inference_steps || body.steps || body.inferenceSteps || 8,
       lora: body.lora || null,
       title: body.title || null
     };
+  }
+
+  /** Contract for the MCP `describe` action and GET /v1/audio/music/describe. */
+  describeCapabilities() {
+    return MUSIC_CAPABILITIES;
   }
 
   // ------------------------------------------------------------------- engine

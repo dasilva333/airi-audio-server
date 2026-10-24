@@ -89,82 +89,8 @@ class AudioCppEngine {
   }
 
   getCudaPaths() {
-    const detectedPaths = new Set();
-    const baseCandidates = [];
-
-    if (this.config.cuda_path) {
-      if (Array.isArray(this.config.cuda_path)) {
-        this.config.cuda_path.forEach(p => baseCandidates.push(this.resolvePath(p)));
-      } else {
-        baseCandidates.push(this.resolvePath(this.config.cuda_path));
-      }
-    }
-    if (process.env.CUDA_PATH) {
-      baseCandidates.push(process.env.CUDA_PATH);
-    }
-    if (process.env.CUDA_HOME) {
-      baseCandidates.push(process.env.CUDA_HOME);
-    }
-
-    // Capture all versioned CUDA_PATH environment variables (e.g. CUDA_PATH_V13_1, CUDA_PATH_V12_6)
-    Object.keys(process.env)
-      .filter(k => k.startsWith('CUDA_PATH_V'))
-      .sort((a, b) => b.localeCompare(a))
-      .forEach(k => baseCandidates.push(process.env[k]));
-
-    // Auto-detect all installed CUDA versions from standard Windows toolkit directory
-    const standardToolkitDir = 'C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA';
-    if (fs.existsSync(standardToolkitDir)) {
-      try {
-        const versions = fs.readdirSync(standardToolkitDir).filter(v => v.startsWith('v'));
-        // Numerically sort versions descending (e.g. v13.1 > v12.6 > v11.6)
-        versions.sort((a, b) => {
-          const numA = parseFloat(a.replace(/^v/, '')) || 0;
-          const numB = parseFloat(b.replace(/^v/, '')) || 0;
-          return numB - numA;
-        });
-        versions.forEach(v => baseCandidates.push(path.join(standardToolkitDir, v)));
-      } catch (e) {}
-    }
-
-    // Standard Linux / WSL paths
-    if (process.platform !== 'win32') {
-      ['/usr/local/cuda', '/usr/local/cuda-13', '/usr/local/cuda-12', '/usr/local/cuda-11', '/opt/cuda'].forEach(p => {
-        if (fs.existsSync(p)) baseCandidates.push(p);
-      });
-    }
-
-    // Candidate subdirectories covering both CUDA 13+ (bin/x64) and CUDA 12/11 (bin), plus nvvm & libnvvp
-    const subdirs = [
-      path.join('bin', 'x64'),
-      'bin',
-      path.join('nvvm', 'bin', 'x64'),
-      'libnvvp'
-    ];
-
-    baseCandidates.forEach(base => {
-      if (!base) return;
-      let root = base;
-      const lower = base.toLowerCase();
-      if (lower.endsWith(path.join('bin', 'x64').toLowerCase()) || lower.endsWith('/bin/x64') || lower.endsWith('\\bin\\x64')) {
-        root = path.dirname(path.dirname(base));
-      } else if (lower.endsWith(path.sep + 'bin') || lower.endsWith('/bin') || lower.endsWith('\\bin')) {
-        root = path.dirname(base);
-      }
-
-      subdirs.forEach(sub => {
-        const candidate = path.join(root, sub);
-        if (fs.existsSync(candidate)) {
-          detectedPaths.add(candidate);
-        }
-      });
-
-      if (fs.existsSync(base)) {
-        detectedPaths.add(base);
-      }
-    });
-
-    const result = Array.from(detectedPaths);
+    const { getCudaPaths } = require('./gpu');
+    const result = getCudaPaths(this.config.cuda_path);
     if (result.length === 0) {
       console.warn('[Engine] WARNING: CUDA toolkit not found. Set CUDA_PATH environment variable or cuda_path in config.json.');
     }
@@ -284,11 +210,13 @@ class AudioCppEngine {
 
     const binDir = path.dirname(resolvedServerExe);
     const disableCudaGraphs = modelConfig.session_options?.cuda_graphs === 'false' || modelConfig.family === 'fish_drama3';
+    const currentPath = process.env.PATH || process.env.Path || '';
     const envOverrides = {
       ...process.env,
-      PATH: `${binDir};${cudaBinPath};${process.env.PATH}`,
+      PATH: `${binDir};${cudaBinPath};${currentPath}`,
       ...(disableCudaGraphs ? { GGML_CUDA_DISABLE_GRAPHS: '1' } : {})
     };
+    delete envOverrides.Path;
 
     if (process.platform === 'win32') {
       const runnerBat = path.join(__dirname, '../run_server.bat');
@@ -331,9 +259,11 @@ class AudioCppEngine {
     // Captured so a late 'exit' from a superseded process cannot clear the state of
     // whichever process is current by the time it fires.
     const spawnedChild = this.process;
+    this.lastExitCode = null;
     this.process.on('exit', (code) => {
       if (this.process !== spawnedChild) return;
       console.log(`[Engine] audiocpp_server process exited with code ${code}`);
+      this.lastExitCode = code;
       this.isReady = false;
       this.process = null;
     });
@@ -347,11 +277,17 @@ class AudioCppEngine {
   }
 
   async pollHealthCheck(timeoutMs = 300000) {
+    const { isCudaMissingExitCode, formatCudaMissingBanner, getGpuComputeCap } = require('./gpu');
     const startTime = Date.now();
     while (Date.now() - startTime < timeoutMs) {
       if (!this.process) {
+        if (isCudaMissingExitCode(this.lastExitCode)) {
+          const banner = formatCudaMissingBanner(getGpuComputeCap());
+          console.error(`\n${banner}\n`);
+          throw new Error(banner);
+        }
         const lastErrOutput = this.lastLogs.slice(-20).join('\n');
-        throw new Error(`audiocpp_server process exited unexpectedly during initialization.\n--- Captured Engine Logs ---\n${lastErrOutput || 'No stdout/stderr logged.'}`);
+        throw new Error(`audiocpp_server process exited unexpectedly during initialization (code ${this.lastExitCode}).\n--- Captured Engine Logs ---\n${lastErrOutput || 'No stdout/stderr logged.'}`);
       }
       try {
         const ok = await new Promise((resolve) => {

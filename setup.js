@@ -210,7 +210,7 @@ function runSetup() {
     } catch (e) {}
   }
 
-  const { resolveEngineBinary } = require('./src/gpu');
+  const { resolveEngineBinary, getGpuComputeCap, testCudaRuntime, formatCudaMissingBanner } = require('./src/gpu');
   let audioCppDir = config.audio_cpp?.working_dir || "../audio.cpp";
   let resolvedServerExe = resolveEngineBinary('audiocpp_server', config.audio_cpp?.server_exe) || resolvePath(config.audio_cpp?.server_exe || path.join(audioCppDir, "build/windows-cuda-release/bin/audiocpp_server.exe"));
 
@@ -218,6 +218,27 @@ function runSetup() {
     input: process.stdin,
     output: process.stdout
   });
+
+  const checkCudaStatus = (callback) => {
+    if (fs.existsSync(resolvedServerExe)) {
+      const runtimeCheck = testCudaRuntime(resolvedServerExe, config.cuda_path);
+      if (runtimeCheck.missingCuda) {
+        const gpuCap = getGpuComputeCap();
+        console.log('\n' + formatCudaMissingBanner(gpuCap) + '\n');
+        rl.question("If CUDA Toolkit is installed in a custom directory (e.g. D:\\CUDA), enter the path (or press Enter to skip): ", (customCuda) => {
+          const trimmed = customCuda.trim();
+          if (trimmed) {
+            config.cuda_path = trimmed;
+            fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2), 'utf-8');
+            console.log(`Saved custom cuda_path: "${trimmed}" to config.json\n`);
+          }
+          callback();
+        });
+        return;
+      }
+    }
+    callback();
+  };
 
   const checkAndPromptAudioCpp = (callback) => {
     if (!fs.existsSync(resolvedServerExe)) {
@@ -238,10 +259,10 @@ function runSetup() {
           config.audio_cpp.server_exe = newExePath;
           resolvedServerExe = resolvePath(newExePath);
         }
-        callback();
+        checkCudaStatus(callback);
       });
     } else {
-      callback();
+      checkCudaStatus(callback);
     }
   };
 

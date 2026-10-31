@@ -28,7 +28,8 @@
 7. **Zero File Deletion Policy & Automatic Archiving**:
    - Voice reference files are **never deleted**. Replaced or updated voice files are automatically preserved with timestamped backups in `voices/archive/`.
 8. **Shared Ingestion & Short Audio Normalization (`src/voices.js` & `src/ffmpeg.js`)**:
-   - Converts uploaded audio clips to 24kHz mono PCM WAV via FFmpeg safely (handling in-place normalization).
+   - Converts uploaded audio clips to 24kHz mono PCM WAV via FFmpeg's high-precision SoXR resampler with triangular dithering (handling in-place normalization).
+   - Requires an FFmpeg build with `libsoxr`; stereo is downmixed to mono rather than discarding either input channel.
    - Self-concatenates reference clips shorter than 1.5s to 3–5 seconds so zero-shot voice cloning never fails.
 9. **Unified Serialized GPU Queue (`src/queue.js`)**: Single FIFO queue for all GPU tasks (TTS synthesis, STT transcriptions, voice registrations), preventing VRAM collisions.
 10. **Real-Time Factor (RTF) Metrics & Headers**: Computes exact latency, audio duration, RTF, and real-time speed, returning them in custom HTTP headers (`X-Real-Time-Factor`, `X-Realtime-Speed`, `X-Synthesis-Latency-Ms`, `X-Audio-Duration-Sec`).

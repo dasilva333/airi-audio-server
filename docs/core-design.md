@@ -15,6 +15,11 @@
 
 ### 2. Shared Voice Ingestion Pipeline & Audio Normalization
 * **Unified Ingestion Function (`ingestVoiceAudio`)**: A single shared pipeline consumed by both `POST /v1/voices` and `POST /v1/audio/speech` (when a voice file lacks a sidecar transcript).
+* **High-Quality Resampling**: Audio is converted to 24 kHz mono PCM WAV using FFmpeg's SoXR resampler at 20-bit (28-bit unneeded) precision and triangular dithering. FFmpeg must be built with `libsoxr`. Stereo is downmixed instead of selecting only the left channel, which could discard right-channel-only audio.
+--note for Richie: 
+ **Rule of Thumb when using FFMPEG:**
+• Use -ar when you need a quick, dirty conversion where audio fidelity doesn't matter. You might not care, but default FFMPEG sounds baaaaaaaaaaaaaad.
+• Use -af when preparing pristine source audio for machine learning, AI training, or cloning. You don't want to ruin the base sound forever with trash default sampling just because its 0.0X seconds faster. )
 * **Short Audio Self-Concatenation**: If reference audio is too short (< 1.5s), the ingestion pipeline automatically merges/concatenates the audio file onto itself via `ffmpeg` until it reaches optimal length (3.0s–5.0s) so it passes zero-shot model cloning requirements cleanly.
 * **Automatic Whisper Sidecar**: Auto-transcribes via GPU `whisper.cpp`, writes `<voice_id>.txt`, and registers the transcript into `voices/voice_vocabulary.json`.
 

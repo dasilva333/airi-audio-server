@@ -91,7 +91,7 @@ function normalizeAudioToWav(inputPath, outputPath, ffmpegPath = null) {
     const ffmpeg = spawn(ffmpegBin, [
       '-y',
       '-i', inputPath,
-      '-ar', '24000',
+      '-af', 'aresample=resampler=soxr:precision=20:osr=24000:dither_method=triangular',
       '-ac', '1',
       '-c:a', 'pcm_s16le',
       actualOutput

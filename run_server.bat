@@ -1,68 +1,105 @@
 @echo off
 setlocal enabledelayedexpansion
-set "BINDIR=%~dp1"
+rem ---------------------------------------------------------------------------
+rem AIRI Audio Server - audio.cpp launcher (backend-agnostic)
+rem
+rem Args:
+rem   %1  EXE_PATH      audiocpp_server.exe to run
+rem   %2  CFG_PATH      generated server.json
+rem   %3  RUNTIME_PATHS semicolon-separated runtime lib dirs for the backend
+rem   %4  BACKEND       cuda | vulkan | cpu | metal
+rem ---------------------------------------------------------------------------
 set "EXE_PATH=%~1"
 set "CFG_PATH=%~2"
-set "CUSTOM_CUDA_PATH=%~3"
+set "RUNTIME_PATHS=%~3"
+set "BACKEND=%~4"
+set "BINDIR=%~dp1"
 
-set "CUDA_PATHS="
-if not "%CUSTOM_CUDA_PATH%"=="" (
-    set "CUDA_PATHS=%CUSTOM_CUDA_PATH%"
+if "%BACKEND%"=="" set "BACKEND=cuda"
+
+set "EXTRA_PATHS=%RUNTIME_PATHS%"
+
+if /i "%BACKEND%"=="cuda" (
+    rem --- CUDA runtime discovery (preserved legacy behaviour) ---
+    if not "%CUDA_PATH%"=="" (
+        if exist "%CUDA_PATH%\bin\x64" (
+            if "!EXTRA_PATHS!"=="" (set "EXTRA_PATHS=%CUDA_PATH%\bin\x64") else (set "EXTRA_PATHS=!EXTRA_PATHS!;%CUDA_PATH%\bin\x64")
+        )
+        if exist "%CUDA_PATH%\bin" (
+            if "!EXTRA_PATHS!"=="" (set "EXTRA_PATHS=%CUDA_PATH%\bin") else (set "EXTRA_PATHS=!EXTRA_PATHS!;%CUDA_PATH%\bin")
+        )
+        if exist "%CUDA_PATH%\nvvm\bin\x64" (
+            if "!EXTRA_PATHS!"=="" (set "EXTRA_PATHS=%CUDA_PATH%\nvvm\bin\x64") else (set "EXTRA_PATHS=!EXTRA_PATHS!;%CUDA_PATH%\nvvm\bin\x64")
+        )
+        if exist "%CUDA_PATH%\libnvvp" (
+            if "!EXTRA_PATHS!"=="" (set "EXTRA_PATHS=%CUDA_PATH%\libnvvp") else (set "EXTRA_PATHS=!EXTRA_PATHS!;%CUDA_PATH%\libnvvp")
+        )
+    )
+
+    rem Auto-detect installed CUDA toolkits (CUDA 13+ bin\x64 and CUDA 12/11 bin layouts)
+    for /d %%V in ("C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v*") do (
+        if exist "%%V\bin\x64" (
+            if "!EXTRA_PATHS!"=="" (set "EXTRA_PATHS=%%V\bin\x64") else (set "EXTRA_PATHS=!EXTRA_PATHS!;%%V\bin\x64")
+        )
+        if exist "%%V\bin" (
+            if "!EXTRA_PATHS!"=="" (set "EXTRA_PATHS=%%V\bin") else (set "EXTRA_PATHS=!EXTRA_PATHS!;%%V\bin")
+        )
+        if exist "%%V\nvvm\bin\x64" (
+            if "!EXTRA_PATHS!"=="" (set "EXTRA_PATHS=%%V\nvvm\bin\x64") else (set "EXTRA_PATHS=!EXTRA_PATHS!;%%V\nvvm\bin\x64")
+        )
+        if exist "%%V\libnvvp" (
+            if "!EXTRA_PATHS!"=="" (set "EXTRA_PATHS=%%V\libnvvp") else (set "EXTRA_PATHS=!EXTRA_PATHS!;%%V\libnvvp")
+        )
+    )
+
+    if "!EXTRA_PATHS!"=="" (
+        echo [run_server.bat] WARNING: CUDA_PATH not set and no CUDA installation detected.
+        echo [run_server.bat] NOTICE: If audiocpp_server fails to start with error 3221225781 (0xC0000135),
+        echo [run_server.bat]         please install NVIDIA CUDA Toolkit: https://developer.nvidia.com/cuda-downloads
+    )
 )
 
-if not "%CUDA_PATH%"=="" (
-    if exist "%CUDA_PATH%\bin\x64" (
-        if "!CUDA_PATHS!"=="" (set "CUDA_PATHS=%CUDA_PATH%\bin\x64") else (set "CUDA_PATHS=!CUDA_PATHS!;%CUDA_PATH%\bin\x64")
+if /i "%BACKEND%"=="vulkan" (
+    rem The Vulkan loader (vulkan-1.dll) normally ships with the GPU driver, so no
+    rem path is strictly required. Inject the SDK Bin dir when it is available.
+    if not "%VULKAN_SDK%"=="" (
+        if exist "%VULKAN_SDK%\Bin" (
+            if "!EXTRA_PATHS!"=="" (set "EXTRA_PATHS=%VULKAN_SDK%\Bin") else (set "EXTRA_PATHS=!EXTRA_PATHS!;%VULKAN_SDK%\Bin")
+        )
+        if exist "%VULKAN_SDK%\bin" (
+            if "!EXTRA_PATHS!"=="" (set "EXTRA_PATHS=%VULKAN_SDK%\bin") else (set "EXTRA_PATHS=!EXTRA_PATHS!;%VULKAN_SDK%\bin")
+        )
     )
-    if exist "%CUDA_PATH%\bin" (
-        if "!CUDA_PATHS!"=="" (set "CUDA_PATHS=%CUDA_PATH%\bin") else (set "CUDA_PATHS=!CUDA_PATHS!;%CUDA_PATH%\bin")
-    )
-    if exist "%CUDA_PATH%\nvvm\bin\x64" (
-        if "!CUDA_PATHS!"=="" (set "CUDA_PATHS=%CUDA_PATH%\nvvm\bin\x64") else (set "CUDA_PATHS=!CUDA_PATHS!;%CUDA_PATH%\nvvm\bin\x64")
-    )
-    if exist "%CUDA_PATH%\libnvvp" (
-        if "!CUDA_PATHS!"=="" (set "CUDA_PATHS=%CUDA_PATH%\libnvvp") else (set "CUDA_PATHS=!CUDA_PATHS!;%CUDA_PATH%\libnvvp")
-    )
-)
-
-rem Auto-detect any installed CUDA versions (supporting CUDA 13+ bin\x64 and CUDA 12/11 bin layouts)
-for /d %%V in ("C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v*") do (
-    if exist "%%V\bin\x64" (
-        if "!CUDA_PATHS!"=="" (set "CUDA_PATHS=%%V\bin\x64") else (set "CUDA_PATHS=!CUDA_PATHS!;%%V\bin\x64")
-    )
-    if exist "%%V\bin" (
-        if "!CUDA_PATHS!"=="" (set "CUDA_PATHS=%%V\bin") else (set "CUDA_PATHS=!CUDA_PATHS!;%%V\bin")
-    )
-    if exist "%%V\nvvm\bin\x64" (
-        if "!CUDA_PATHS!"=="" (set "CUDA_PATHS=%%V\nvvm\bin\x64") else (set "CUDA_PATHS=!CUDA_PATHS!;%%V\nvvm\bin\x64")
-    )
-    if exist "%%V\libnvvp" (
-        if "!CUDA_PATHS!"=="" (set "CUDA_PATHS=%%V\libnvvp") else (set "CUDA_PATHS=!CUDA_PATHS!;%%V\libnvvp")
+    if "!EXTRA_PATHS!"=="" (
+        echo [run_server.bat] NOTE: Vulkan runtime uses the driver-provided loader; no extra paths injected.
     )
 )
 
-if "!CUDA_PATHS!"=="" (
-    echo [run_server.bat] WARNING: CUDA_PATH not set and no CUDA installation detected.
-    echo [run_server.bat] NOTICE: If audiocpp_server fails to start with error 3221225781 (0xC0000135),
-    echo [run_server.bat]         please install NVIDIA CUDA Toolkit 13: https://developer.nvidia.com/cuda-downloads
+set "PATH=%BINDIR%;!EXTRA_PATHS!;%PATH%"
+
+echo [run_server.bat] BACKEND: %BACKEND%
+echo [run_server.bat] BINDIR:  "%BINDIR%"
+echo [run_server.bat] RUNTIME: "!EXTRA_PATHS!"
+echo [run_server.bat] EXE:     "%EXE_PATH%"
+echo [run_server.bat] CFG:     "%CFG_PATH%"
+
+rem server.json already declares the backend; pass --backend explicitly for
+rem non-CUDA backends so a Vulkan/CPU selection can never be silently ignored.
+if /i "%BACKEND%"=="cuda" (
+    "%EXE_PATH%" --config "%CFG_PATH%"
+) else (
+    "%EXE_PATH%" --config "%CFG_PATH%" --backend %BACKEND%
 )
-
-set "PATH=%BINDIR%;!CUDA_PATHS!;%PATH%"
-
-echo [run_server.bat] BINDIR: "%BINDIR%"
-echo [run_server.bat] CUDA:   "!CUDA_PATHS!"
-echo [run_server.bat] EXE:    "%EXE_PATH%"
-echo [run_server.bat] CFG:    "%CFG_PATH%"
-
-"%EXE_PATH%" --config "%CFG_PATH%"
 set "ENGINE_EXIT=!ERRORLEVEL!"
-if "!ENGINE_EXIT!"=="-1073741515" (
-    echo:
-    echo ========================================================================
-    echo [run_server.bat] FATAL: Error 0xC0000135 (STATUS_DLL_NOT_FOUND)
-    echo NVIDIA CUDA runtime libraries (cublas64_13.dll) are missing from your PC.
-    echo Please install NVIDIA CUDA Toolkit 13.1: https://developer.nvidia.com/cuda-downloads
-    echo ========================================================================
-    echo:
+if /i "%BACKEND%"=="cuda" (
+    if "!ENGINE_EXIT!"=="-1073741515" (
+        echo:
+        echo ========================================================================
+        echo [run_server.bat] FATAL: Error 0xC0000135 (STATUS_DLL_NOT_FOUND)
+        echo NVIDIA CUDA runtime libraries (cublas64_13.dll) are missing from your PC.
+        echo Please install NVIDIA CUDA Toolkit 13.1: https://developer.nvidia.com/cuda-downloads
+        echo ========================================================================
+        echo:
+    )
 )
 exit /b !ENGINE_EXIT!

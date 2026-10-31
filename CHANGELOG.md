@@ -4,6 +4,26 @@ All notable changes to `airi-audio-server` are documented in this file.
 
 ---
 
+## [1.2.0] - 2026-10-07
+
+### 🚀 Highlights
+- **Configurable GPU backend (CUDA / Vulkan / CPU)**: the inference backend is now selected from `config.json` (`gpu.backend`) or the `AIRI_GPU_BACKEND` env var, with `auto` preferring CUDA on NVIDIA and Vulkan otherwise. This enables AMD Radeon GPUs via the Vulkan build of `audio.cpp` while keeping the CUDA path unchanged.
+- **No silent CPU fallback**: an unresolvable backend now raises a clear error instead of degrading to CPU.
+- **Backend-aware tooling**: `audiocpp_server`/`audiocpp_cli` are resolved per backend, runtime library paths (CUDA toolkit / Vulkan SDK) are injected automatically, and `npm run gpu-info` reports the resolved backend, device and live `/health`.
+
+### ✨ Features & Enhancements
+- **Centralized GPU module (`src/gpu.js`)**: backend/device resolution, per-backend binary discovery (`bin/windows-vulkan/`, `build/windows-*-release/bin/`), Vulkan SDK detection (incl. a project-local `../VulkanSDK`), and CUDA runtime discovery that was previously duplicated across five files.
+- **AMD / Vulkan support**: new `install-vulkan.bat`, `npm run build:vulkan`, and `docs/AMD_VULKAN.md`; uses the upstream `windows-vulkan-release` preset and the `audiocpp_server` target.
+- **Local build helper (`tools/build-audio-cpp.js`, `npm run build:cuda|vulkan|cpu`)**: reports missing prerequisites explicitly instead of failing deep inside CMake.
+- **Backend-aware engine & CLI tools**: `backend`/`device` are written into the generated `server.json`; CUDA-only session options are no longer sent to Vulkan/CPU; the ASR/SFX/Music/VoiceDesign tools pass `--backend`/`--device` (Music and VoiceDesign previously defaulted to CPU).
+- **Diagnostics**: `/health` now exposes `backend`, `device`, `engine_exe`, `gpu_device` and `cpu_fallback_detected`; `npm run gpu-info` prints a full report.
+
+### 🐞 Fixes
+- GPU device names are captured strictly from `ggml_*` device-enumeration lines (no false positives from CUDA paths).
+- A CPU backend request may reuse an existing CUDA/Vulkan build, since those builds also include the CPU backend.
+
+---
+
 ## [1.1.0] - 2026-08-13
 
 ### 🚀 Highlights

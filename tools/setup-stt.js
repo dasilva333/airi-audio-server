@@ -99,10 +99,10 @@ async function main() {
   }
 
   config.asr = {
-    cli_exe: 'bin/windows-cuda/audiocpp_cli.exe',
+    cli_exe: '',
     model_path: 'models/Citrinet-ASR-GGUF/citrinet-asr-q8_0.gguf',
     family: 'citrinet_asr',
-    backend: 'cuda'
+    backend: 'auto'
   };
 
   fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2), 'utf8');
@@ -121,13 +121,13 @@ async function main() {
     const testAudio = path.resolve(__dirname, '../voices/abby_character_cheery.wav');
     if (fs.existsSync(testAudio)) {
       const tStart = Date.now();
-      const text = await transcribeAudio(testAudio, config.asr);
+      const text = await transcribeAudio(testAudio, config.asr, config);
       const elapsedMs = Date.now() - tStart;
       if (text) {
         console.log(`      ✅ Self-test PASSED in ${elapsedMs}ms!`);
         console.log(`      Sample transcript: "${text.slice(0, 70)}..."`);
       } else {
-        console.warn(`      ⚠️ Self-test produced empty transcript. Check CUDA drivers.`);
+        console.warn(`      ⚠️ Self-test produced empty transcript. Check the GPU driver / selected backend.`);
       }
     }
   }

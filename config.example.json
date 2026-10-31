@@ -1,18 +1,23 @@
 {
   "port": 8095,
   "host": "0.0.0.0",
+  "gpu": {
+    "backend": "auto",
+    "device": 0,
+    "vulkan_sdk_path": ""
+  },
   "audio_cpp": {
-    "server_exe": "../audio.cpp/build/windows-cuda-release/bin/audiocpp_server.exe",
+    "server_exe": "",
     "working_dir": "../audio.cpp",
     "internal_port": 8080,
     "stream_frame_interval": 25,
     "keep_alive_interval_ms": 0
   },
   "asr": {
-    "cli_exe": "bin/windows-cuda/audiocpp_cli.exe",
+    "cli_exe": "",
     "model_path": "models/Citrinet-ASR-GGUF/citrinet-asr-q8_0.gguf",
     "family": "citrinet_asr",
-    "backend": "cuda"
+    "backend": "auto"
   },
   "chatterbox_voices_dir": "../chatterbox/voices",
   "installed_models": [

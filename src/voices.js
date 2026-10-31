@@ -12,11 +12,12 @@ function resolvePath(relativePath) {
 }
 
 class VoiceManager {
-  constructor(voicesDir, vocabularyPath, asrConfig, chatterboxDir = '../chatterbox/voices') {
+  constructor(voicesDir, vocabularyPath, asrConfig, chatterboxDir = '../chatterbox/voices', appConfig = {}) {
     this.voicesDir = resolvePath(voicesDir);
     this.vocabularyPath = resolvePath(vocabularyPath);
     this.chatterboxDir = resolvePath(chatterboxDir);
     this.asrConfig = asrConfig;
+    this.appConfig = appConfig;
     this.vocabulary = {};
     
     // Auto-create voicesDir if missing
@@ -136,7 +137,7 @@ class VoiceManager {
     } else {
       // Transcribe reference clip with local ASR engine
       try {
-        transcript = await transcribeAudio(targetWavPath, this.asrConfig);
+        transcript = await transcribeAudio(targetWavPath, this.asrConfig, this.appConfig);
       } catch (asrErr) {
         console.warn(`[Voices Warning] ASR transcription failed for '${voiceId}': ${asrErr.message}`);
         transcript = '';

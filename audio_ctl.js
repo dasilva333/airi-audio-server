@@ -211,8 +211,14 @@ async function main() {
     case 'restart':
       await restartServer(isHeadless);
       break;
+    case 'gpu':
+    case 'gpu-info': {
+      const { spawnSync } = require('child_process');
+      spawnSync(process.execPath, [path.join(SERVER_DIR, 'tools', 'gpu-info.js')], { stdio: 'inherit' });
+      break;
+    }
     default:
-      console.log(`Usage: node audio_ctl.js [status|start|stop|restart] [--window]`);
+      console.log(`Usage: node audio_ctl.js [status|start|stop|restart|gpu] [--window]`);
       break;
   }
 }
